@@ -17,14 +17,13 @@ import com.google.api.services.calendar.model.Event;
 import com.google.api.services.calendar.model.Events;
 import com.leavebridge.calendar.service.CalendarService;
 
+import lombok.RequiredArgsConstructor;
+
 @RestController
 @RequestMapping("/api/calendar")
+@RequiredArgsConstructor
 public class CalendarController {
 	private final CalendarService calendarService;
-
-	public CalendarController(CalendarService calendarService) {
-		this.calendarService = calendarService;
-	}
 
 	/**
 	 * 공휴일 이벤트 조회
