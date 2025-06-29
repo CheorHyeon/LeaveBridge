@@ -14,7 +14,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.google.api.services.calendar.model.Event;
-import com.google.api.services.calendar.model.Events;
 import com.leavebridge.calendar.service.CalendarService;
 
 import lombok.RequiredArgsConstructor;
@@ -28,10 +27,10 @@ public class CalendarController {
 	/**
 	 * 공휴일 이벤트 조회
 	 */
-	@GetMapping("/holiday-events")
-	public ResponseEntity<List<Event>> getUpcomingHolidaysEvents() throws Exception {
-		Events events = calendarService.findHolidayFromGoogleCalendar();
-		return ResponseEntity.ok(events.getItems());
+	@PostMapping("/holiday-events")
+	public ResponseEntity<String> getUpcomingHolidaysEvents() throws Exception {
+		calendarService.findHolidayFromGoogleCalendar();
+		return ResponseEntity.ok("공휴일 데이터가 성공적으로 저장되었습니다.");
 	}
 
 	/**
