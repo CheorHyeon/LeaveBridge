@@ -3,6 +3,7 @@ package com.leavebridge.calendar.service;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.Date;
@@ -10,6 +11,7 @@ import java.util.List;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.util.DateTime;
@@ -17,6 +19,9 @@ import com.google.api.services.calendar.Calendar;
 import com.google.api.services.calendar.model.Event;
 import com.google.api.services.calendar.model.EventDateTime;
 import com.google.api.services.calendar.model.Events;
+import com.leavebridge.calendar.entity.LeaveAndHoliday;
+import com.leavebridge.calendar.enums.LeaveType;
+import com.leavebridge.calendar.repository.LeaveAndHolidayRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,10 +29,12 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@Transactional(readOnly = true)
 public class CalendarService {
 	private final Calendar calendarClient;
 	private final static String GOOGLE_KOREA_HOLIDAY_CALENDAR_ID = "ko.south_korea#holiday@group.v.calendar.google.com";
 	private static final String DEFAULT_TIME_ZONE = "Asia/Seoul";
+	private final LeaveAndHolidayRepository leaveAndHolidayRepository;
 
 	@Value("${google.calendar-id}")
 	private String GOOGLE_PERSONAL_CALENDAR_ID;
@@ -35,8 +42,28 @@ public class CalendarService {
 	/**
 	 * 공휴일 데이터를 가져오는 API
 	 */
-	public Events findHolidayFromGoogleCalendar() throws IOException {
-		return calendarClient.events().list(GOOGLE_KOREA_HOLIDAY_CALENDAR_ID).execute();
+	@Transactional
+	public void findHolidayFromGoogleCalendar() throws IOException {
+		// 1) 올해 연도 구하기
+		int currentYear = LocalDate.now().getYear();
+		LocalDateTime startOfYear = LocalDate.of(currentYear, 1, 1).atStartOfDay();
+		LocalDateTime endOfYear = LocalDate.of(currentYear, 12, 31).atTime(LocalTime.MAX);
+
+		// 2) 이미 올해 공휴일이 저장되어 있으면 바로 예외
+		boolean exists = leaveAndHolidayRepository.existsByLeaveTypeAndStartDateBetween(LeaveType.HOLIDAY, startOfYear,
+			endOfYear);
+		if (exists) {
+			throw new IllegalStateException("이미 해당 년도의 공휴일이 모두 로드되어 가져오지 않습니다.");
+		}
+
+		Events holidaysEvents = calendarClient.events().list(GOOGLE_KOREA_HOLIDAY_CALENDAR_ID).execute();
+
+		List<LeaveAndHoliday> list = holidaysEvents.getItems().stream()
+			.map(item -> LeaveAndHoliday.of(item, 0L, LeaveType.HOLIDAY))
+			.toList();
+
+		leaveAndHolidayRepository.saveAll(list);
+
 	}
 
 	/**
@@ -88,7 +115,8 @@ public class CalendarService {
 	/**
 	 * 지정된 calendarId에 연차를 등록합니다.
 	 */
-	public Event createTimedEvent(String summary, LocalDateTime startDateTime, LocalDateTime endDateTime) throws IOException {
+	public Event createTimedEvent(String summary, LocalDateTime startDateTime, LocalDateTime endDateTime) throws
+		IOException {
 		// 1) Event 객체 생성 및 기본 정보 설정
 		Event event = new Event()
 			.setSummary(summary);
@@ -127,7 +155,7 @@ public class CalendarService {
 
 		// 2) 시작/종료 시각을 새 값으로 설정
 		DateTime startDt = new DateTime(Date.from(newStart.atZone(ZoneId.of(DEFAULT_TIME_ZONE)).toInstant()));
-		DateTime endDt   = new DateTime(Date.from(newEnd.atZone(ZoneId.of(DEFAULT_TIME_ZONE)).toInstant()));
+		DateTime endDt = new DateTime(Date.from(newEnd.atZone(ZoneId.of(DEFAULT_TIME_ZONE)).toInstant()));
 
 		existing.setStart(new EventDateTime()
 			.setDateTime(startDt));

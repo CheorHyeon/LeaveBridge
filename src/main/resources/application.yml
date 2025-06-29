@@ -2,3 +2,14 @@ spring:
   profiles:
     active: dev
     include: secret
+  jpa:
+    properties:
+      hibernate:
+        default_batch_fetch_size: 100
+    show-sql: false
+    open-in-view: true # 기본값이나 명시적 설정 (타임리프 쓰니, 뷰단까지 프록시 유지되도록)
+
+decorator:
+  datasource:
+    p6spy:
+      enable-logging: true

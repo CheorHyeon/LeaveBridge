@@ -55,6 +55,7 @@
             // 여러 속성들
             initialView: 'dayGridMonth',  // 초기 보기 설정, 기본값 dayGridMonth
             initialDate: getFormattedDate(),  // 캘린더 로드 시 초기 날짜 설절, 기본값 오늘 날짜
+            displayEventEnd: true,    // 종료 시간도 함께 표시
             locale: 'ko',  // 언머 및 지역화 설정 변경
             timeZone: 'Asia/Seoul', // IANA 시간대 설정(명명된 시간대)
             weekends: true,  // 주말 포함 여부 기본값 true
@@ -113,7 +114,7 @@
                     id : 2,
                     groupId: 2,
                     title: '일정2',
-                    start: '2025-06-29',
+                    start: '2025-06-20',
                     end: '2025-06-30'
                 },
                 // 시간 포함 일정
