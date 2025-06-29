@@ -28,18 +28,10 @@
                 <!-- 연차사용현황 버튼 -->
                 <li class="nav-item">
                     <a class="nav-link" th:href="@{/usage}">연차사용현황</a>
-                </li>
-                <!-- 로그인(비인증 시) -->
-                <li class="nav-item" sec:authorize="!isAuthenticated()">
-                    <a class="nav-link" th:href="@{/login}">로그인</a>
-                </li>
-                <!-- 로그아웃(인증 시) -->
-                <li class="nav-item" sec:authorize="isAuthenticated()">
-                    <form th:action="@{/logout}" method="post" class="d-inline">
-                        <button type="submit" class="btn btn-link nav-link p-0">
-                            로그아웃
-                        </button>
-                    </form>
+                    <a class="nav-link font-bold" sec:authorize="isAnonymous()" th:href="@{/user/login}">로그인</a>
+                    <a sec:authorize="isAuthenticated()" class="nav-link" href="javascript:;"
+                       onclick="this.nextElementSibling.submit();">로그아웃</a>
+                    <form sec:authorize="isAuthenticated()" method="POST" hidden th:action="@{/user/logout}"></form>
                 </li>
             </ul>
         </div>
@@ -126,12 +118,15 @@
                     allDays: false  // true인 경우 시간 텍스트 함께 표시되지 않음
                 }
             ],
-            // events : '/api/events'          // 서버에서 일정 JSON 데이터 로드
+            // 서버에서 일정 JSON 데이터 로드
+            // events : '/api/events'
+
             // event 클릭 함수 정의 -> 일정 정보 (수정, 삭제 가능하도록)
             eventClick: function (info) {
                 alert('일정 제목: ' + info.event.title); // 제목 표시
                 // 일정 다시 불러오기 (서버)
             },
+
             // 날짜나 시간 클릭 시 발생 -> 일정 생성 폼 등록
             dateClick: function (info) {
                 alert('클릭한 날짜: ' + info.dateStr); // 클릭한 날짜
