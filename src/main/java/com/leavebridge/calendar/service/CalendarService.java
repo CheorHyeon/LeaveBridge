@@ -1,10 +1,7 @@
 package com.leavebridge.calendar.service;
 
 import java.io.IOException;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.Date;
 import java.util.List;
@@ -18,9 +15,8 @@ import com.google.api.client.util.DateTime;
 import com.google.api.services.calendar.Calendar;
 import com.google.api.services.calendar.model.Event;
 import com.google.api.services.calendar.model.EventDateTime;
-import com.google.api.services.calendar.model.Events;
+import com.leavebridge.calendar.dto.MonthlyEvent;
 import com.leavebridge.calendar.entity.LeaveAndHoliday;
-import com.leavebridge.calendar.enums.LeaveType;
 import com.leavebridge.calendar.repository.LeaveAndHolidayRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -39,32 +35,6 @@ public class CalendarService {
 	@Value("${google.calendar-id}")
 	private String GOOGLE_PERSONAL_CALENDAR_ID;
 
-	/**
-	 * 공휴일 데이터를 가져오는 API
-	 */
-	@Transactional
-	public void findHolidayFromGoogleCalendar() throws IOException {
-		// 1) 올해 연도 구하기
-		int currentYear = LocalDate.now().getYear();
-		LocalDateTime startOfYear = LocalDate.of(currentYear, 1, 1).atStartOfDay();
-		LocalDateTime endOfYear = LocalDate.of(currentYear, 12, 31).atTime(LocalTime.MAX);
-
-		// 2) 이미 올해 공휴일이 저장되어 있으면 바로 예외
-		boolean exists = leaveAndHolidayRepository.existsByLeaveTypeAndStartDateBetween(LeaveType.HOLIDAY, startOfYear,
-			endOfYear);
-		if (exists) {
-			throw new IllegalStateException("이미 해당 년도의 공휴일이 모두 로드되어 가져오지 않습니다.");
-		}
-
-		Events holidaysEvents = calendarClient.events().list(GOOGLE_KOREA_HOLIDAY_CALENDAR_ID).execute();
-
-		List<LeaveAndHoliday> list = holidaysEvents.getItems().stream()
-			.map(item -> LeaveAndHoliday.of(item, 0L, LeaveType.HOLIDAY))
-			.toList();
-
-		leaveAndHolidayRepository.saveAll(list);
-
-	}
 
 	/**
 	 * 특정 이벤트의 상세 정보를 조회합니다.
@@ -86,30 +56,21 @@ public class CalendarService {
 	}
 
 	/**
-	 * 지정된 calendarId의, year년 month월 전체 이벤트 조회
+	 * 지정된 calendarId의 설정한 연도, 월에 해당하는 일정 목록 로드
 	 */
-	public List<Event> listMonthlyEvents(int year, int month) throws Exception {
-		log.info("GOOGLE_PERSONAL_CALENDAR_ID ::{}", GOOGLE_PERSONAL_CALENDAR_ID);
-		// 월 시작: yyyy-MM-01T00:00:00Z
-		DateTime timeMin = new DateTime(String.format("%04d-%02d-01T00:00:00Z", year, month));
-		// 1) YearMonth로 말일(LocalDate) 구하기
-		YearMonth ym = YearMonth.of(year, month);
-		LocalDate lastDayDate = ym.atEndOfMonth();
+	public List<MonthlyEvent> listMonthlyEvents(int year, int month) throws Exception {
+		log.info("CalendarService.listMonthlyEvents :: year={}, month={}", year, month);
 
-		// 2) 말일 자정(UTC)을 포함한 ISO 8601 문자열 생성
-		String timeMaxIso = String.format("%sT23:59:59Z", lastDayDate);
+		LocalDateTime startDate = LocalDateTime.of(year, month, 1, 1, 0, 0);
+		LocalDateTime endDate = startDate.plusMonths(1);  // 다음 달 1일 00:00
 
-		// 3) DateTime 객체로 변환
-		DateTime timeMax = new DateTime(timeMaxIso);
+		// 시작일이 지정한 날짜 이상인 것
+		List<LeaveAndHoliday> currentMonthEvents = leaveAndHolidayRepository.findAllByStartDateGreaterThanEqualAndStartDateLessThan(
+			startDate, endDate);
 
-		Events events = calendarClient.events().list(GOOGLE_PERSONAL_CALENDAR_ID)
-			.setTimeMin(timeMin)
-			.setTimeMax(timeMax)
-			.setSingleEvents(true)    // 반복 이벤트를 각 회차별로 개별 인스턴스로 분할해 반환
-			.setOrderBy("startTime")
-			.execute();
-
-		return events.getItems();
+		return currentMonthEvents.stream()
+			.map(MonthlyEvent::from)
+			.toList();
 	}
 
 	/**
