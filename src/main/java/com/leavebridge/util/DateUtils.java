@@ -2,7 +2,6 @@ package com.leavebridge.util;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.time.ZoneId;
 
 import com.google.api.services.calendar.model.Event;
@@ -24,17 +23,20 @@ public class DateUtils {
 		}
 		// 2) all-day 이벤트인 경우 date 필드만 채워짐
 		LocalDate date = LocalDate.parse(dt.getDate().toStringRfc3339());
-		// 시작이면 자정, 종료면 다음 날 자정(배타적 end) 또는 당일 23:59:59
+		// 시작이면 자정, 종료면 당일 23:59:59
 		return isStart
 			? date.atStartOfDay()
-			: date.atTime(LocalTime.MAX);
+			: date.atStartOfDay().minusNanos(1);  // all-day 이벤트의 경우 다음날 00:00:00 이기 때문에 1초 빼기
 	}
 
 	/**
 	 * 구글 캘린더 Event 객체를 통해 하루종일 이벤트인지 시간 정해진 이벤트인지 확인
 	 */
 	public static boolean determineAllDay(Event event) {
-		return event.getStart().getDateTime() == null;
+		// start.date 가 채워져 있으면 dateOnly:true 인 all-day 이벤트
+		//  EventDateTime.getDateTime()이 값이 있으면 시간 지정 이벤트 (all-day가 아님)
+		//   EventDateTime.getDate()이 값이 있으면 종일 이벤트 (all-day)
+		return event.getStart().getDate() != null;
 	}
 
 	/**

@@ -6,7 +6,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import com.google.api.services.calendar.model.Event;
@@ -36,7 +35,7 @@ public class LeaveAndHoliday {
 	private LocalDateTime endDate;
 
 	@Column(name = "IS_ALL_DAY")
-	private Boolean allDay;
+	private Boolean isAllDay;
 
 	// TODO : User 테이블 설계 후 변경
 	@Column(name = "USER_ID")
@@ -45,6 +44,9 @@ public class LeaveAndHoliday {
 	@Enumerated(EnumType.STRING)
 	@Column(name = "LEAVE_TYPE", length = 50)
 	private LeaveType leaveType;
+
+	@Column(name = "GOOGLE_EVENT_ID")
+	private String googleEventId;
 
 	public static LeaveAndHoliday of (Event event, Long userId, LeaveType leaveType) {
 
@@ -56,9 +58,10 @@ public class LeaveAndHoliday {
 			.title(event.getSummary())
 			.startDate(start)
 			.endDate(end)
-			.allDay(isAllDay)
+			.isAllDay(isAllDay)
 			.userId(userId)
 			.leaveType(leaveType)
+			.googleEventId(event.getId())
 			.build();
 	}
 }
