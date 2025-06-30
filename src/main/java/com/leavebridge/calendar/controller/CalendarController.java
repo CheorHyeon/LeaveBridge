@@ -14,31 +14,27 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.google.api.services.calendar.model.Event;
+import com.leavebridge.calendar.dto.MonthlyEvent;
 import com.leavebridge.calendar.service.CalendarService;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @RestController
 @RequestMapping("/api/calendar")
 @RequiredArgsConstructor
+@Slf4j
 public class CalendarController {
-	private final CalendarService calendarService;
 
-	/**
-	 * 공휴일 이벤트 조회
-	 */
-	@PostMapping("/holiday-events")
-	public ResponseEntity<String> getUpcomingHolidaysEvents() throws Exception {
-		calendarService.findHolidayFromGoogleCalendar();
-		return ResponseEntity.ok("공휴일 데이터가 성공적으로 저장되었습니다.");
-	}
+	private final CalendarService calendarService;
 
 	/**
 	 * 이번달 구글 캘린더 등록 이벤트 조회
 	 */
-	@GetMapping("/events")
-	public ResponseEntity<List<Event>> getUpcomingEvents() throws Exception {
-		List<Event> events = calendarService.listMonthlyEvents(2025, 6);
+	@GetMapping("/events/{year}/{month}")
+	public ResponseEntity<List<MonthlyEvent>> getUpcomingEvents(@PathVariable Integer year, @PathVariable Integer month) throws Exception {
+		log.info("getUpcomingEvents :: year={}, month={}", year, month);
+		List<MonthlyEvent> events = calendarService.listMonthlyEvents(year, month);
 		return ResponseEntity.ok(events);
 	}
 

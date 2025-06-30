@@ -48,6 +48,9 @@ dependencies {
     // security
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.thymeleaf.extras:thymeleaf-extras-springsecurity6' // 타임리프에서 시큐리티
+
+    // @retry 사용하기 위한 의존성 추가
+    implementation("org.springframework.retry:spring-retry")
 }
 
 tasks.named('test') {

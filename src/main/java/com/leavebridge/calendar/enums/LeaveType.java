@@ -14,7 +14,9 @@ public enum LeaveType {
 
 	OUTING("외출"),
 
-	SUMMER_VACATION("여름휴가");
+	SUMMER_VACATION("여름휴가"),
+
+	OTHER_PEOPLE("비회원 연차");
 
 	private final String type;
 }
