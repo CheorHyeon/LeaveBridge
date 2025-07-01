@@ -14,9 +14,9 @@ public record MonthlyEventDetailResponse(
 	Long id,
 	@Schema(description = "일정 제목", example = "박철현 연차")
 	String title,
-	@Schema(description = "시작 시간", example = "2025-07-01T14:00:00Z")
+	@Schema(description = "시작 시간", example = "2025-07-01T14:00:00")
 	LocalDateTime startDate,
-	@Schema(description = "종료 시간", example = "2025-07-01T14:00:00Z")
+	@Schema(description = "종료 시간", example = "2025-07-01T14:00:00")
 	LocalDateTime endDate,
 	@Schema(description = "하루 종일 이벤트 여부", example = "true or false")
 	Boolean isAllDay,
