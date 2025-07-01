@@ -53,9 +53,9 @@ public class CalendarController {
 	 * 일정 등록
 	 **/
 	@PostMapping("/events")
-	public ResponseEntity<Event> createHolidays() throws Exception {
-		Event event = calendarService.createTimedEvent("박철현 연차", LocalDateTime.now(), LocalDateTime.now());
-		return ResponseEntity.ok(event);
+	public ResponseEntity<Void> createHolidays(@RequestBody CreateLeaveRequestDto createLeaveRequestDto) throws Exception {
+		calendarService.createTimedEvent(createLeaveRequestDto);
+		return ResponseEntity.ok().build();
 	}
 
 	/**

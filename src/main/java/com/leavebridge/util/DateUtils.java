@@ -6,6 +6,8 @@ import java.time.ZoneId;
 
 import com.google.api.services.calendar.model.Event;
 import com.google.api.services.calendar.model.EventDateTime;
+import com.leavebridge.calendar.dto.CreateLeaveRequestDto;
+import com.leavebridge.calendar.enums.LeaveType;
 
 public class DateUtils {
 
@@ -47,5 +49,28 @@ public class DateUtils {
 			java.time.Instant.ofEpochMilli(millis),
 			ZoneId.of("Asia/Seoul")
 		);
+	}
+
+	public static boolean determineAllDayByCreateLeaveRequestDto(CreateLeaveRequestDto requestDto) {
+		LeaveType type = requestDto.leaveType();
+
+		// 1) FULL_DAY_LEAVE, SUMMER_VACATION, HOLIDAY 는 모두 종일(all-day)
+		if (type == LeaveType.FULL_DAY_LEAVE
+			|| type == LeaveType.SUMMER_VACATION
+			|| type == LeaveType.HOLIDAY) {
+			return true;
+		}
+
+		// 2) 시작·종료가 같은 날이고 8 ~ 17시로 정확한 경우도 true
+		LocalDateTime start = requestDto.startDate();
+		LocalDateTime end = requestDto.endDate();
+		if (start.toLocalDate().equals(end.toLocalDate())) {
+			if (start.getHour() == 8 && end.getHour() >= 17) {
+				return true;
+			}
+		}
+
+		// 그 외는 all-day 아님
+		return false;
 	}
 }

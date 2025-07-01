@@ -15,6 +15,7 @@ import com.google.api.client.util.DateTime;
 import com.google.api.services.calendar.Calendar;
 import com.google.api.services.calendar.model.Event;
 import com.google.api.services.calendar.model.EventDateTime;
+import com.leavebridge.calendar.dto.CreateLeaveRequestDto;
 import com.leavebridge.calendar.dto.MonthlyEvent;
 import com.leavebridge.calendar.dto.MonthlyEventDetailResponse;
 import com.leavebridge.calendar.entity.LeaveAndHoliday;
@@ -68,28 +69,42 @@ public class CalendarService {
 	/**
 	 * 지정된 calendarId에 연차를 등록합니다.
 	 */
-	public Event createTimedEvent(String summary, LocalDateTime startDateTime, LocalDateTime endDateTime) throws
-		IOException {
+	@Transactional
+	public void createTimedEvent(CreateLeaveRequestDto requestDto) throws IOException {
 		// 1) Event 객체 생성 및 기본 정보 설정
-		Event event = new Event()
-			.setSummary(summary);
+		Event event = new Event().setSummary(requestDto.title());
 
 		// 2) 시작 시각 설정
-		DateTime startDT = new DateTime(Date.from(startDateTime.atZone(ZoneId.of(DEFAULT_TIME_ZONE)).toInstant()));
-		EventDateTime start = new EventDateTime()
-			.setDateTime(startDT);
+		DateTime startDT = new DateTime(Date.from(requestDto.startDate().atZone(ZoneId.of(DEFAULT_TIME_ZONE)).toInstant()));
+		EventDateTime start = new EventDateTime().setDateTime(startDT);
 		event.setStart(start);
 
 		// 3) 종료 시각 설정
-		DateTime endDT = new DateTime(Date.from(endDateTime.atZone(ZoneId.of(DEFAULT_TIME_ZONE)).toInstant()));
-		EventDateTime end = new EventDateTime()
-			.setDateTime(endDT);
+		DateTime endDT = new DateTime(Date.from(requestDto.endDate().atZone(ZoneId.of(DEFAULT_TIME_ZONE)).toInstant()));
+		EventDateTime end = new EventDateTime().setDateTime(endDT);
 		event.setEnd(end);
 
-		// 4) 이벤트 등록
-		return calendarClient.events()
+		// 4) Calendar API 호출하여 등록
+		Event created = calendarClient.events()
 			.insert(GOOGLE_PERSONAL_CALENDAR_ID, event)
 			.execute();
+
+		try {
+			// TODO : Security 에서 user 정보 꺼내서 id 넣도록 수정
+			LeaveAndHoliday entity = LeaveAndHoliday.of(requestDto, 2L, created.getId());
+			leaveAndHolidayRepository.saveAndFlush(entity);
+		} catch (RuntimeException dbException) {
+			// 캘린더에 저장된거 삭제
+			try {
+				calendarClient.events()
+					.delete(GOOGLE_PERSONAL_CALENDAR_ID, event.getId())
+					.execute();
+			} catch (Exception ignore) {
+				log.error("Calendar에 저장 성공했으나 DB 저장 실패하여 캘린더 삭제 시도했으나 삭제 실패, 수동 업데이트 필요 event = {}", event);
+			}
+			// db 예외난거는 다시 롤백하기 위해서 예외 다시 던짐
+			throw dbException;
+		}
 	}
 
 	/**
