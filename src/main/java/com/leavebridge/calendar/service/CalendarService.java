@@ -16,6 +16,7 @@ import com.google.api.services.calendar.Calendar;
 import com.google.api.services.calendar.model.Event;
 import com.google.api.services.calendar.model.EventDateTime;
 import com.leavebridge.calendar.dto.MonthlyEvent;
+import com.leavebridge.calendar.dto.MonthlyEventDetailResponse;
 import com.leavebridge.calendar.entity.LeaveAndHoliday;
 import com.leavebridge.calendar.repository.LeaveAndHolidayRepository;
 
@@ -35,24 +36,15 @@ public class CalendarService {
 	@Value("${google.calendar-id}")
 	private String GOOGLE_PERSONAL_CALENDAR_ID;
 
-
 	/**
 	 * 특정 이벤트의 상세 정보를 조회합니다.
 	 */
-	public Event getEventDetails(String eventId) throws IOException {
-		try {
-			return calendarClient.events()
-				.get(GOOGLE_PERSONAL_CALENDAR_ID, eventId)
-				.execute();
-		} catch (GoogleJsonResponseException e) {
-			// 404 Not Found 처리
-			if (e.getStatusCode() == 404) {
-				log.warn("이벤트를 찾을 수 없습니다. eventId={}", eventId);
-				return null;
-			}
-			// 그 외 오류는 다시 던집니다.
-			throw new RuntimeException(e.getMessage());
-		}
+	public MonthlyEventDetailResponse getEventDetails(Long eventId) {
+
+		LeaveAndHoliday leaveAndHoliday = leaveAndHolidayRepository.findById(eventId).orElseThrow(
+			() -> new IllegalArgumentException("존재하지 않는 일정 Id입니다."));
+
+		return MonthlyEventDetailResponse.from(leaveAndHoliday);
 	}
 
 	/**

@@ -10,11 +10,14 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.google.api.services.calendar.model.Event;
+import com.leavebridge.calendar.dto.CreateLeaveRequestDto;
 import com.leavebridge.calendar.dto.MonthlyEvent;
+import com.leavebridge.calendar.dto.MonthlyEventDetailResponse;
 import com.leavebridge.calendar.service.CalendarService;
 
 import lombok.RequiredArgsConstructor;
@@ -42,9 +45,8 @@ public class CalendarController {
 	 * 특정 이벤트 상세 조회
 	 */
 	@GetMapping("/events/{eventId}")
-	public ResponseEntity<Event> getEventDetail(@PathVariable("eventId") String eventId) throws Exception {
-		Event events = calendarService.getEventDetails(eventId);
-		return ResponseEntity.ok(events);
+	public ResponseEntity<MonthlyEventDetailResponse> getEventDetail(@PathVariable("eventId") Long eventId){
+		return ResponseEntity.ok(calendarService.getEventDetails(eventId));
 	}
 
 	/**
