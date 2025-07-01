@@ -149,10 +149,6 @@ public class CalendarService {
 				.execute();
 		} catch (GoogleJsonResponseException e) {
 			if (e.getStatusCode() == 404) {
-				log.warn("업데이트 도중 이벤트를 찾을 수 없습니다. eventId={}", eventId);
-			}
-			throw new RuntimeException(e.getMessage());
-		}
 				log.error("업데이트할 이벤트를 찾을 수 없음: googleEventId={}", googleEventId);
 			}
 			throw new IllegalArgumentException("이벤트 업데이트 실패", e);
@@ -220,17 +216,30 @@ public class CalendarService {
 	/**
 	 * 지정한 이벤트(eventId)를 삭제합니다.
 	 */
-	public void deleteEvent(String eventId) throws IOException {
+	@Transactional
+	public void deleteEvent(Long eventId) throws IOException {
+		log.info("deleteEvent :: event Id = {}", eventId);
+
+		LeaveAndHoliday leaveAndHoliday = leaveAndHolidayRepository.findById(eventId)
+			.orElseThrow(() -> new IllegalArgumentException("해당 Id를 가진 이벤트가 없습니다."));
+
+		// TODO : 사용자 & 로직 검증 추가
+
+		// 1) DB 삭제 우선
+		leaveAndHolidayRepository.delete(leaveAndHoliday);
+
+		// 2) 캘린더 삭제 -> 이미 삭제된거는 DB 삭제만 처리하면 되니까
 		try {
 			calendarClient.events()
-				.delete(GOOGLE_PERSONAL_CALENDAR_ID, eventId)
+				// 객체는 아직 살아있기에 꺼내오기 가능
+				.delete(GOOGLE_PERSONAL_CALENDAR_ID, leaveAndHoliday.getGoogleEventId())
 				.execute();
 		} catch (GoogleJsonResponseException e) {
 			switch (e.getStatusCode()) {
-				case 404 -> log.warn("삭제할 이벤트를 찾을 수 없습니다. eventId={}", eventId);
-				case 410 -> log.warn("이미 삭제된 이벤트입니다. eventId={}", eventId);
+				case 404 -> log.error("삭제할 이벤트를 찾을 수 없습니다. eventId={}", eventId);
+				case 410 -> log.error("이미 삭제된 이벤트입니다. eventId={}", eventId);
+				default -> throw new RuntimeException("예외 발생으로 삭제 불가", e);
 			}
-			throw new RuntimeException(e.getMessage());
 		}
 	}
 }

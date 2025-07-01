@@ -70,7 +70,7 @@ public class CalendarController {
 	 * 특정 이벤트 삭제
 	 */
 	@DeleteMapping("/events/{eventId}")
-	public ResponseEntity<Void> deleteHolidays(@PathVariable("eventId") String eventId) throws IOException {
+	public ResponseEntity<Void> deleteHolidays(@PathVariable("eventId") Long eventId) throws IOException {
 		calendarService.deleteEvent(eventId);
 		return ResponseEntity.ok().build();
 	}
