@@ -1,7 +1,6 @@
 package com.leavebridge.calendar.controller;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
@@ -14,10 +13,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.google.api.services.calendar.model.Event;
 import com.leavebridge.calendar.dto.CreateLeaveRequestDto;
 import com.leavebridge.calendar.dto.MonthlyEvent;
 import com.leavebridge.calendar.dto.MonthlyEventDetailResponse;
+import com.leavebridge.calendar.dto.PatchLeaveRequestDto;
 import com.leavebridge.calendar.service.CalendarService;
 
 import lombok.RequiredArgsConstructor;
@@ -62,8 +61,8 @@ public class CalendarController {
 	 * 특정 이벤트 수정
 	 */
 	@PatchMapping("/events/{eventId}")
-	public ResponseEntity<Void> updateHolidays(@PathVariable("eventId") String eventId) throws IOException {
-		calendarService.updateEventDate(eventId, LocalDateTime.now(), LocalDateTime.now());
+	public ResponseEntity<Void> updateHolidays(@PathVariable("eventId") Long eventId, @RequestBody PatchLeaveRequestDto patchLeaveRequestDto) throws IOException {
+		calendarService.updateEventDate(eventId, patchLeaveRequestDto);
 		return ResponseEntity.ok().build();
 	}
 
@@ -71,7 +70,7 @@ public class CalendarController {
 	 * 특정 이벤트 삭제
 	 */
 	@DeleteMapping("/events/{eventId}")
-	public ResponseEntity<Void> deleteHolidays(@PathVariable("eventId") String eventId) throws IOException {
+	public ResponseEntity<Void> deleteHolidays(@PathVariable("eventId") Long eventId) throws IOException {
 		calendarService.deleteEvent(eventId);
 		return ResponseEntity.ok().build();
 	}
