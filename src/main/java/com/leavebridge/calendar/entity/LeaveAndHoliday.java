@@ -1,17 +1,25 @@
 package com.leavebridge.calendar.entity;
 
-import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-
 import java.time.LocalDateTime;
 
 import com.google.api.services.calendar.model.Event;
 import com.leavebridge.calendar.dto.CreateLeaveRequestDto;
+import com.leavebridge.calendar.dto.PatchLeaveRequestDto;
 import com.leavebridge.calendar.enums.LeaveType;
 import com.leavebridge.util.DateUtils;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Getter
@@ -52,11 +60,11 @@ public class LeaveAndHoliday {
 	@Column(name = "DESCRIPTION")
 	private String description;
 
-	public static LeaveAndHoliday of (Event event, Long userId, LeaveType leaveType) {
+	public static LeaveAndHoliday of(Event event, Long userId, LeaveType leaveType) {
 
 		LocalDateTime start = DateUtils.parseDateTime(event.getStart(), true);
-		LocalDateTime end   = DateUtils.parseDateTime(event.getEnd(), false);
-		boolean isAllDay     = DateUtils.determineAllDay(event);
+		LocalDateTime end = DateUtils.parseDateTime(event.getEnd(), false);
+		boolean isAllDay = DateUtils.determineAllDay(event);
 
 		return LeaveAndHoliday.builder()
 			.title(event.getSummary())
@@ -72,7 +80,7 @@ public class LeaveAndHoliday {
 
 	public static LeaveAndHoliday of(CreateLeaveRequestDto requestDto, long userId, String googleCalendarId) {
 
-		boolean isAllDay = DateUtils.determineAllDayByCreateLeaveRequestDto(requestDto);
+		boolean isAllDay = DateUtils.determineAllDay(requestDto);
 
 		return LeaveAndHoliday.builder()
 			.title(requestDto.title())
@@ -84,5 +92,25 @@ public class LeaveAndHoliday {
 			.googleEventId(googleCalendarId)
 			.description(requestDto.description())
 			.build();
+	}
+
+	public void patchEntityByDto(PatchLeaveRequestDto dto) {
+		if (dto.title() != null) {
+			this.title = dto.title();
+		}
+		if (dto.startDate() != null) {
+			this.startDate = dto.startDate();
+		}
+		if (dto.endDate() != null) {
+			this.endDate = dto.endDate();
+		}
+		if (dto.leaveType() != null) {
+			this.leaveType = dto.leaveType();
+		}
+		if (dto.description() != null) {
+			this.description = dto.description();
+		}
+		boolean isAllDay = DateUtils.determineAllDay(dto);
+		this.isAllDay = isAllDay;
 	}
 }
