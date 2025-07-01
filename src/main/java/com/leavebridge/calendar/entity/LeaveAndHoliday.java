@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 import com.google.api.services.calendar.model.Event;
+import com.leavebridge.calendar.dto.CreateLeaveRequestDto;
 import com.leavebridge.calendar.enums.LeaveType;
 import com.leavebridge.util.DateUtils;
 
@@ -48,6 +49,9 @@ public class LeaveAndHoliday {
 	@Column(name = "GOOGLE_EVENT_ID")
 	private String googleEventId;
 
+	@Column(name = "DESCRIPTION")
+	private String description;
+
 	public static LeaveAndHoliday of (Event event, Long userId, LeaveType leaveType) {
 
 		LocalDateTime start = DateUtils.parseDateTime(event.getStart(), true);
@@ -62,6 +66,23 @@ public class LeaveAndHoliday {
 			.userId(userId)
 			.leaveType(leaveType)
 			.googleEventId(event.getId())
+			.description(event.getDescription())
+			.build();
+	}
+
+	public static LeaveAndHoliday of(CreateLeaveRequestDto requestDto, long userId, String googleCalendarId) {
+
+		boolean isAllDay = DateUtils.determineAllDayByCreateLeaveRequestDto(requestDto);
+
+		return LeaveAndHoliday.builder()
+			.title(requestDto.title())
+			.startDate(requestDto.startDate())
+			.endDate(requestDto.endDate())
+			.isAllDay(isAllDay)
+			.userId(userId)
+			.leaveType(requestDto.leaveType())
+			.googleEventId(googleCalendarId)
+			.description(requestDto.description())
 			.build();
 	}
 }
