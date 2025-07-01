@@ -9,6 +9,7 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.util.DateTime;
@@ -163,7 +164,7 @@ public class CalendarService {
 		boolean changed = false;
 
 		// --- 1) summary(제목) 검사/적용 ---
-		if (dto.title() != null) {
+		if (StringUtils.hasText(dto.title())) {
 			String curTitle = apiEvent.getSummary();
 			if (!dto.title().equals(curTitle)) {
 				apiEvent.setSummary(dto.title());
@@ -172,7 +173,7 @@ public class CalendarService {
 		}
 
 		// --- 2) description(설명) 검사/적용 ---
-		if (dto.description() != null) {
+		if (StringUtils.hasText(dto.description())) {
 			String curDesc = apiEvent.getDescription();
 			if (!dto.description().equals(curDesc)) {
 				apiEvent.setDescription(dto.description());
