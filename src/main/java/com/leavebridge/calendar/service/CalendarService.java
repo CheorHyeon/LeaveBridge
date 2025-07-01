@@ -18,8 +18,10 @@ import com.google.api.services.calendar.model.EventDateTime;
 import com.leavebridge.calendar.dto.CreateLeaveRequestDto;
 import com.leavebridge.calendar.dto.MonthlyEvent;
 import com.leavebridge.calendar.dto.MonthlyEventDetailResponse;
+import com.leavebridge.calendar.dto.PatchLeaveRequestDto;
 import com.leavebridge.calendar.entity.LeaveAndHoliday;
 import com.leavebridge.calendar.repository.LeaveAndHolidayRepository;
+import com.leavebridge.util.DateUtils;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -110,30 +112,40 @@ public class CalendarService {
 	/**
 	 * 기존 이벤트(eventId)의 시작/종료 시각을 업데이트합니다.
 	 */
-	public Event updateEventDate(
-		String eventId,
-		LocalDateTime newStart,
-		LocalDateTime newEnd
-	) throws IOException {
-		log.info("new Start :: {}", newStart);
-		// 1) 먼저 기존 이벤트를 가져옵니다.
-		Event existing = calendarClient.events()
-			.get(GOOGLE_PERSONAL_CALENDAR_ID, eventId)
-			.execute();
+	@Transactional
+	public void updateEventDate(Long eventId, PatchLeaveRequestDto dto) throws IOException {
+		log.info("new updateEventDate :: event Id = {}, dtp = {}", eventId, dto);
 
-		// 2) 시작/종료 시각을 새 값으로 설정
-		DateTime startDt = new DateTime(Date.from(newStart.atZone(ZoneId.of(DEFAULT_TIME_ZONE)).toInstant()));
-		DateTime endDt = new DateTime(Date.from(newEnd.atZone(ZoneId.of(DEFAULT_TIME_ZONE)).toInstant()));
+		LeaveAndHoliday leaveAndHoliday = leaveAndHolidayRepository.findById(eventId)
+			.orElseThrow(() -> new IllegalArgumentException("해당 Id를 가진 이벤트가 없습니다."));
 
-		existing.setStart(new EventDateTime()
-			.setDateTime(startDt));
-		existing.setEnd(new EventDateTime()
-			.setDateTime(endDt));
+		// TODO : 사용자 & 로직 검증 추가
 
-		// 3) patch 호출
+		// 1) 엔티티 수정
+		leaveAndHoliday.patchEntityByDto(dto);
+
+		String googleEventId = leaveAndHoliday.getGoogleEventId();
+
+		// 2) Google 이벤트에서 현재 start/end 정보 조회
+		Event apiEvent;
 		try {
-			return calendarClient.events()
-				.patch(GOOGLE_PERSONAL_CALENDAR_ID, eventId, existing)
+			apiEvent = calendarClient.events()
+				.get(GOOGLE_PERSONAL_CALENDAR_ID, googleEventId)
+				.execute();
+		} catch (IOException e) {
+			throw new IllegalArgumentException("Google 이벤트 조회 실패", e);
+		}
+
+		// 3) 변경 없으면 바로 리턴
+		if (!applyAllChanges(apiEvent, dto)) {
+			return;
+		}
+
+		// TODO : 에외 공통화
+		// 4) 변경된 필드가 있으면 PATCH 호출
+		try {
+			calendarClient.events()
+				.patch(GOOGLE_PERSONAL_CALENDAR_ID, googleEventId, apiEvent)
 				.execute();
 		} catch (GoogleJsonResponseException e) {
 			if (e.getStatusCode() == 404) {
@@ -141,6 +153,68 @@ public class CalendarService {
 			}
 			throw new RuntimeException(e.getMessage());
 		}
+				log.error("업데이트할 이벤트를 찾을 수 없음: googleEventId={}", googleEventId);
+			}
+			throw new IllegalArgumentException("이벤트 업데이트 실패", e);
+		}
+	}
+
+	/**
+	 * apiEvent 에 dto 의 변경값(summary, description, startDate, endDate)을
+	 * 실제로 달라졌을 때만 적용하고, 하나라도 바뀌면 true 반환
+	 */
+	private boolean applyAllChanges(Event apiEvent, PatchLeaveRequestDto dto) {
+		boolean changed = false;
+
+		// --- 1) summary(제목) 검사/적용 ---
+		if (dto.title() != null) {
+			String curTitle = apiEvent.getSummary();
+			if (!dto.title().equals(curTitle)) {
+				apiEvent.setSummary(dto.title());
+				changed = true;
+			}
+		}
+
+		// --- 2) description(설명) 검사/적용 ---
+		if (dto.description() != null) {
+			String curDesc = apiEvent.getDescription();
+			if (!dto.description().equals(curDesc)) {
+				apiEvent.setDescription(dto.description());
+				changed = true;
+			}
+		}
+
+		// --- 3) startDate 검사/적용 ---
+		if (dto.startDate() != null) {
+			LocalDateTime newStart = dto.startDate();
+			DateTime curDt = apiEvent.getStart().getDateTime();
+			LocalDateTime curStart = DateUtils.convertToLocalDateTime(curDt.getValue());
+			if (!curStart.equals(newStart)) {
+				apiEvent.setStart(new EventDateTime()
+					.setDateTime(new DateTime(
+						Date.from(newStart.atZone(ZoneId.of(DEFAULT_TIME_ZONE)).toInstant())
+					))
+				);
+				changed = true;
+			}
+		}
+
+		// --- 4) endDate 검사/적용 ---
+		if (dto.endDate() != null) {
+			LocalDateTime newEnd = dto.endDate();
+			DateTime curDt = apiEvent.getEnd().getDateTime();
+			LocalDateTime curEnd = DateUtils.convertToLocalDateTime(curDt.getValue());
+			if (!curEnd.equals(newEnd)) {
+				apiEvent.setEnd(new EventDateTime()
+					.setDateTime(new DateTime(
+						Date.from(newEnd.atZone(ZoneId.of(DEFAULT_TIME_ZONE)).toInstant())
+					))
+				);
+				changed = true;
+			}
+		}
+
+		return changed;
 	}
 
 	/**
