@@ -1,5 +1,6 @@
 package com.leavebridge.member.service;
 
+import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -100,6 +101,12 @@ public class MemberService {
 
 		// 날짜별 루프 (하루 단위 탐색)
 		for (LocalDate d = start.toLocalDate(); !d.isAfter(end.toLocalDate()); d = d.plusDays(1)) {
+
+			// ──➤ ① 주말(토·일) 스킵 ─────────────────
+			DayOfWeek dow = d.getDayOfWeek();
+			if (dow == DayOfWeek.SATURDAY || dow == DayOfWeek.SUNDAY) {
+				continue;               // 분/일 계산 없이 다음 날로
+			}
 
 			// 해당 날짜의 시작/종료 시각 결정
 			// 시작, 종료일이 아니라면 중간에 낀거니까 이건 1일 연차임이 자명 -> 일 시작, 종료 시간으로 세팅
