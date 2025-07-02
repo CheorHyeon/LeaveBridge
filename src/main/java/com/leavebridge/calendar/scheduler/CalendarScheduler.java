@@ -20,6 +20,7 @@ import com.google.api.services.calendar.model.Events;
 import com.leavebridge.calendar.entity.LeaveAndHoliday;
 import com.leavebridge.calendar.enums.LeaveType;
 import com.leavebridge.calendar.repository.LeaveAndHolidayRepository;
+import com.leavebridge.member.entitiy.Member;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,6 +36,8 @@ public class CalendarScheduler {
 
 	@Value("${google.calendar-id}")
 	private String GOOGLE_PERSONAL_CALENDAR_ID;
+
+	private final Member dummyMember = Member.builder().id(4L).build();
 
 	private final static String GOOGLE_KOREA_HOLIDAY_CALENDAR_ID = "ko.south_korea#holiday@group.v.calendar.google.com";
 
@@ -71,7 +74,7 @@ public class CalendarScheduler {
 
 		List<Event> items = events.getItems();
 
-		processAndSaveNewEvents(items, 0L, LeaveType.OTHER_PEOPLE);
+		processAndSaveNewEvents(items, LeaveType.OTHER_PEOPLE);
 	}
 
 	// @Scheduled(cron = "0 */1 * * * *") //1분마다 적용 확인을 위해 일단 달아둠
@@ -85,10 +88,10 @@ public class CalendarScheduler {
 
 		List<Event> items = holidaysEvents.getItems();
 
-		processAndSaveNewEvents(items, 0L, LeaveType.HOLIDAY);
+		processAndSaveNewEvents(items, LeaveType.HOLIDAY);
 	}
 
-	private void processAndSaveNewEvents(List<Event> events, Long userId, LeaveType type) {
+	private void processAndSaveNewEvents(List<Event> events, LeaveType type) {
 		if (events.isEmpty()) {
 			return;
 		}
@@ -102,7 +105,7 @@ public class CalendarScheduler {
 		// 3) 신규 이벤트만 매핑 후 저장
 		List<LeaveAndHoliday> toSave = events.stream()
 			.filter(e -> !existingIds.contains(e.getId()))
-			.map(e -> LeaveAndHoliday.of(e, userId, type))
+			.map(e -> LeaveAndHoliday.of(e, dummyMember, type))
 			.sorted(Comparator.comparing(LeaveAndHoliday::getStartDate))
 			.toList();
 
