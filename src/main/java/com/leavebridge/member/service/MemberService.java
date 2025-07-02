@@ -88,9 +88,9 @@ public class MemberService {
 	 */
 	private double calcUsedDays(LeaveAndHoliday l) {
 
-		// 0) 점심시간만으로 이루어진 일정이나 공휴일이면 차감 0
+		// 공휴일이면 차감 0
 		// TODO : 회의, 병결, 공가 등 추가하여 연차 소진 안되게 타입 지정 가능
-		if (isOnlyLunch(l.getStartDate(), l.getEndDate()) || l.getLeaveType() == LeaveType.HOLIDAY) {
+		if (l.getLeaveType() == LeaveType.HOLIDAY) {
 			return 0.0;
 		}
 
@@ -117,6 +117,12 @@ public class MemberService {
 			LocalDateTime dayEnd = d.equals(end.toLocalDate())
 				? end // 이번 반복의 종료일이 매개변수 종료일과 같다면 이 날짜의 연차 끝날로봄
 				: d.atTime(WORK_END); // 이번 반복이 연차 종료일이 아니라면(중간일 - 당연히 1일 연차니깐 일과 끝나는 시간으로 변경)
+
+			// ③ **“점심만 일정”이면 continue;**  ← 위치 이동
+			if (isOnlyLunch(dayStart, dayEnd)) {
+				continue;             // 차감 0, 다음 날로
+			}
+
 			// 하루 분 단위 근무시간
 			long minutes = Duration.between(dayStart, dayEnd).toMinutes();
 
@@ -134,7 +140,7 @@ public class MemberService {
 			totalMinutes += minutes;
 		}
 
-		// 8시간=480분 → 1일
+		// 8시간 = 480분 → 1일
 		return (totalMinutes / 60.0) / 8.0;
 	}
 
