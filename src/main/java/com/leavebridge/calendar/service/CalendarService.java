@@ -22,6 +22,7 @@ import com.leavebridge.calendar.dto.MonthlyEventDetailResponse;
 import com.leavebridge.calendar.dto.PatchLeaveRequestDto;
 import com.leavebridge.calendar.entity.LeaveAndHoliday;
 import com.leavebridge.calendar.repository.LeaveAndHolidayRepository;
+import com.leavebridge.member.entitiy.Member;
 import com.leavebridge.util.DateUtils;
 
 import lombok.RequiredArgsConstructor;
@@ -74,6 +75,8 @@ public class CalendarService {
 	 */
 	@Transactional
 	public void createTimedEvent(CreateLeaveRequestDto requestDto) throws IOException {
+		// TODO : Security 에서 user 정보 꺼내서 id 넣도록 수정
+		Member dummyMember = Member.builder().id(4L).build();
 		// 1) Event 객체 생성 및 기본 정보 설정
 		Event event = new Event().setSummary(requestDto.title());
 
@@ -93,8 +96,7 @@ public class CalendarService {
 			.execute();
 
 		try {
-			// TODO : Security 에서 user 정보 꺼내서 id 넣도록 수정
-			LeaveAndHoliday entity = LeaveAndHoliday.of(requestDto, 2L, created.getId());
+			LeaveAndHoliday entity = LeaveAndHoliday.of(requestDto, dummyMember, created.getId());
 			leaveAndHolidayRepository.saveAndFlush(entity);
 		} catch (RuntimeException dbException) {
 			// 캘린더에 저장된거 삭제

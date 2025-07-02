@@ -6,15 +6,19 @@ import com.google.api.services.calendar.model.Event;
 import com.leavebridge.calendar.dto.CreateLeaveRequestDto;
 import com.leavebridge.calendar.dto.PatchLeaveRequestDto;
 import com.leavebridge.calendar.enums.LeaveType;
+import com.leavebridge.member.entitiy.Member;
 import com.leavebridge.util.DateUtils;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -46,9 +50,9 @@ public class LeaveAndHoliday {
 	@Column(name = "IS_ALL_DAY")
 	private Boolean isAllDay;
 
-	// TODO : User 테이블 설계 후 변경
-	@Column(name = "USER_ID")
-	private Long userId;
+	@JoinColumn(name = "MEMBER_ID")
+	@ManyToOne(fetch = FetchType.LAZY)
+	private Member member;
 
 	@Enumerated(EnumType.STRING)
 	@Column(name = "LEAVE_TYPE", length = 50)
@@ -60,7 +64,7 @@ public class LeaveAndHoliday {
 	@Column(name = "DESCRIPTION")
 	private String description;
 
-	public static LeaveAndHoliday of(Event event, Long userId, LeaveType leaveType) {
+	public static LeaveAndHoliday of(Event event, Member member, LeaveType leaveType) {
 
 		LocalDateTime start = DateUtils.parseDateTime(event.getStart(), true);
 		LocalDateTime end = DateUtils.parseDateTime(event.getEnd(), false);
@@ -71,14 +75,14 @@ public class LeaveAndHoliday {
 			.startDate(start)
 			.endDate(end)
 			.isAllDay(isAllDay)
-			.userId(userId)
+			.member(member)
 			.leaveType(leaveType)
 			.googleEventId(event.getId())
 			.description(event.getDescription())
 			.build();
 	}
 
-	public static LeaveAndHoliday of(CreateLeaveRequestDto requestDto, long userId, String googleCalendarId) {
+	public static LeaveAndHoliday of(CreateLeaveRequestDto requestDto, Member member, String googleCalendarId) {
 
 		boolean isAllDay = DateUtils.determineAllDay(requestDto);
 
@@ -87,7 +91,7 @@ public class LeaveAndHoliday {
 			.startDate(requestDto.startDate())
 			.endDate(requestDto.endDate())
 			.isAllDay(isAllDay)
-			.userId(userId)
+			.member(member)
 			.leaveType(requestDto.leaveType())
 			.googleEventId(googleCalendarId)
 			.description(requestDto.description())
