@@ -6,16 +6,21 @@ import java.util.List;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
+import com.leavebridge.calendar.entity.LeaveAndHoliday;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 @Entity
 @Getter
@@ -36,7 +41,12 @@ public class Member {
 	private String loginId;
 
 	@Column(name = "PASSWORD")
+	@ToString.Exclude
 	private String password;
+
+	@OneToMany(mappedBy = "member", fetch = FetchType.LAZY)
+	@ToString.Exclude
+	private List<LeaveAndHoliday> leaveAndHolidays;
 
 	public List<? extends GrantedAuthority> getGrantedAuthorities() {
 		List<GrantedAuthority> grantedAuthorities = new ArrayList<>();
