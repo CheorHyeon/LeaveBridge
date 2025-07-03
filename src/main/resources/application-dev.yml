@@ -6,3 +6,5 @@ spring:
   jpa:
     hibernate:
       ddl-auto: none
+  thymeleaf:
+    cache: false   # 템플릿 캐싱 비활성화 (개발 환경에서만)
