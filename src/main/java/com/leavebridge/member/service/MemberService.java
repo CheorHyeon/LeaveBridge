@@ -86,16 +86,15 @@ public class MemberService {
 	/**
 	 * LeaveAndHoliday → 사용 “일수” 환산 (하루 단위 분할)
 	 */
-	private double calcUsedDays(LeaveAndHoliday l) {
+	private double calcUsedDays(LeaveAndHoliday leaveAndHoliday) {
 
-		// 공휴일이면 차감 0
-		// TODO : 회의, 병결, 공가 등 추가하여 연차 소진 안되게 타입 지정 가능
-		if (l.getLeaveType() == LeaveType.HOLIDAY) {
+		// 연차 소진 안될 일정이면 사용 시간 0 -> 공휴일, 회의, 공가 등
+		if (!leaveAndHoliday.getLeaveType().isDeductible()) {
 			return 0.0;
 		}
 
-		LocalDateTime start = l.getStartDate();
-		LocalDateTime end = l.getEndDate();
+		LocalDateTime start = leaveAndHoliday.getStartDate();
+		LocalDateTime end = leaveAndHoliday.getEndDate();
 
 		double totalMinutes = 0;
 
