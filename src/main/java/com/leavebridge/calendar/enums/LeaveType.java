@@ -6,19 +6,24 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 @Getter
 public enum LeaveType {
-	HOLIDAY("공휴일"),
+	HOLIDAY("공휴일", false),
 
-	FULL_DAY_LEAVE("1일 연차"),
+	FULL_DAY_LEAVE("1일 연차", true),
 
-	HALF_DAY_LEAVE("반차"),
+	HALF_DAY_MORNING ("오전 반차", true),
 
-	OUTING("외출"),
+	HALF_DAY_AFTERNOON("오후 반차", true),
 
-	SUMMER_VACATION("여름휴가"),
+	OUTING("외출", true),
 
-	OTHER_PEOPLE("비회원 연차");
+	SUMMER_VACATION("여름휴가", true),
 
-	// TODO : 회의, 병결, 공가 등 추가하여 연차 소진 안되게
+	OTHER_PEOPLE("비회원 연차", false),
+
+	NON_DEDUCTIBLE("비차감 휴가", false),  // 공결, 병가, 기타 소진 안될 휴가
+
+	MEETING("회의", false),;
 
 	private final String type;
+	private final boolean isDeductible;  // true면 연차 소진
 }

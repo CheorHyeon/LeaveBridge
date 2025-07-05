@@ -34,7 +34,8 @@ public class CalendarController {
 	 * 이번달 구글 캘린더 등록 이벤트 조회
 	 */
 	@GetMapping("/events/{year}/{month}")
-	public ResponseEntity<List<MonthlyEvent>> getUpcomingEvents(@PathVariable Integer year, @PathVariable Integer month) throws Exception {
+	public ResponseEntity<List<MonthlyEvent>> getUpcomingEvents(@PathVariable Integer year,
+		@PathVariable Integer month) throws Exception {
 		log.info("getUpcomingEvents :: year={}, month={}", year, month);
 		List<MonthlyEvent> events = calendarService.listMonthlyEvents(year, month);
 		return ResponseEntity.ok(events);
@@ -44,7 +45,7 @@ public class CalendarController {
 	 * 특정 이벤트 상세 조회
 	 */
 	@GetMapping("/events/{eventId}")
-	public ResponseEntity<MonthlyEventDetailResponse> getEventDetail(@PathVariable("eventId") Long eventId){
+	public ResponseEntity<MonthlyEventDetailResponse> getEventDetail(@PathVariable("eventId") Long eventId) {
 		return ResponseEntity.ok(calendarService.getEventDetails(eventId));
 	}
 
@@ -52,7 +53,8 @@ public class CalendarController {
 	 * 일정 등록
 	 **/
 	@PostMapping("/events")
-	public ResponseEntity<Void> createHolidays(@RequestBody CreateLeaveRequestDto createLeaveRequestDto) throws Exception {
+	public ResponseEntity<Void> createHolidays(@RequestBody CreateLeaveRequestDto createLeaveRequestDto) throws
+		Exception {
 		calendarService.createTimedEvent(createLeaveRequestDto);
 		return ResponseEntity.ok().build();
 	}
@@ -61,7 +63,8 @@ public class CalendarController {
 	 * 특정 이벤트 수정
 	 */
 	@PatchMapping("/events/{eventId}")
-	public ResponseEntity<Void> updateHolidays(@PathVariable("eventId") Long eventId, @RequestBody PatchLeaveRequestDto patchLeaveRequestDto) throws IOException {
+	public ResponseEntity<Void> updateHolidays(@PathVariable("eventId") Long eventId,
+		@RequestBody PatchLeaveRequestDto patchLeaveRequestDto) throws IOException {
 		calendarService.updateEventDate(eventId, patchLeaveRequestDto);
 		return ResponseEntity.ok().build();
 	}

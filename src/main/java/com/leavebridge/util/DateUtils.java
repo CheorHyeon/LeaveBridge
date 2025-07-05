@@ -2,7 +2,9 @@ package com.leavebridge.util;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
+import java.util.Objects;
 
 import com.google.api.services.calendar.model.Event;
 import com.google.api.services.calendar.model.EventDateTime;
@@ -53,10 +55,27 @@ public class DateUtils {
 	}
 
 	/**
+	 * 주어진 날짜와 시간으로 LocalDateTime 생성.
+	 * @param date 날짜 (null 이면 null 반환)
+	 * @param time 시간 (null 이면 date.atStartOfDay() 사용)
+	 */
+	public static LocalDateTime makeLocalDateTimeFromLocalDAteAndLocalTime(LocalDate date, LocalTime time) {
+		if (Objects.isNull(date)) {
+			return null;
+		}
+		return Objects.isNull(time)
+			? date.atStartOfDay()
+			: LocalDateTime.of(date, time);
+	}
+
+	/**
 	 * Create DTO 전용 래퍼
 	 */
 	public static boolean determineAllDay(CreateLeaveRequestDto dto) {
-		return isAllDay(dto.leaveType(), dto.startDate(), dto.endDate());
+		LocalDateTime starDateTime = DateUtils.makeLocalDateTimeFromLocalDAteAndLocalTime(dto.startDate(), dto.startTime());
+		LocalDateTime endDateTime = DateUtils.makeLocalDateTimeFromLocalDAteAndLocalTime(dto.endDate(), dto.endTime());
+
+		return isAllDay(dto.leaveType(), starDateTime, endDateTime);
 	}
 
 	/**

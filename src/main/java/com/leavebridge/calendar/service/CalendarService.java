@@ -80,15 +80,29 @@ public class CalendarService {
 		// 1) Event 객체 생성 및 기본 정보 설정
 		Event event = new Event().setSummary(requestDto.title());
 
-		// 2) 시작 시각 설정
-		DateTime startDT = new DateTime(Date.from(requestDto.startDate().atZone(ZoneId.of(DEFAULT_TIME_ZONE)).toInstant()));
-		EventDateTime start = new EventDateTime().setDateTime(startDT);
-		event.setStart(start);
+		boolean isAllDay = DateUtils.determineAllDay(requestDto);
 
-		// 3) 종료 시각 설정
-		DateTime endDT = new DateTime(Date.from(requestDto.endDate().atZone(ZoneId.of(DEFAULT_TIME_ZONE)).toInstant()));
-		EventDateTime end = new EventDateTime().setDateTime(endDT);
-		event.setEnd(end);
+		LocalDateTime startLdt = DateUtils.makeLocalDateTimeFromLocalDAteAndLocalTime(
+			requestDto.startDate(), requestDto.startTime());
+
+		LocalDateTime endLdt = DateUtils.makeLocalDateTimeFromLocalDAteAndLocalTime(
+			requestDto.endDate(), requestDto.endTime());
+
+		// 3) 구글 캘린더에 보낼 start/end 설정
+		if (isAllDay) {
+			// 날짜 전용 (종일 이벤트)
+			event.setStart(new EventDateTime().setDate(new DateTime(requestDto.startDate().toString())));
+			// 종료는 “다음 날” 날짜만 넘김
+			event.setEnd(new EventDateTime().setDate(new DateTime(requestDto.endDate().plusDays(1).toString())));
+		} else {
+			// 시간 지정
+			DateTime startDt = new DateTime(Date.from(
+				startLdt.atZone(ZoneId.of(DEFAULT_TIME_ZONE)).toInstant()));
+			DateTime endDt   = new DateTime(Date.from(
+				endLdt.atZone(ZoneId.of(DEFAULT_TIME_ZONE)).toInstant()));
+			event.setStart(new EventDateTime().setDateTime(startDt));
+			event.setEnd(new EventDateTime().setDateTime(endDt));
+		}
 
 		// 4) Calendar API 호출하여 등록
 		Event created = calendarClient.events()

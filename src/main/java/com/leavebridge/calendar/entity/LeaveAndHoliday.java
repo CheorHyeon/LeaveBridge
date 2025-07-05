@@ -2,6 +2,10 @@ package com.leavebridge.calendar.entity;
 
 import java.time.LocalDateTime;
 
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
 import com.google.api.services.calendar.model.Event;
 import com.leavebridge.calendar.dto.CreateLeaveRequestDto;
 import com.leavebridge.calendar.dto.PatchLeaveRequestDto;
@@ -11,6 +15,7 @@ import com.leavebridge.util.DateUtils;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EntityListeners;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
@@ -19,11 +24,13 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 @Entity
 @Getter
@@ -31,6 +38,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 @Table(name = "LEAVE_AND_HOLIDAYS")
+@EntityListeners(AuditingEntityListener.class)
 public class LeaveAndHoliday {
 
 	@Id
@@ -52,8 +60,10 @@ public class LeaveAndHoliday {
 
 	@JoinColumn(name = "MEMBER_ID")
 	@ManyToOne(fetch = FetchType.LAZY)
+	@ToString.Exclude
 	private Member member;
 
+	/* 한번에 연차 1개의 타입만 사용 가능 (여러개면 별도로 만들게) */
 	@Enumerated(EnumType.STRING)
 	@Column(name = "LEAVE_TYPE", length = 50)
 	private LeaveType leaveType;
@@ -63,6 +73,14 @@ public class LeaveAndHoliday {
 
 	@Column(name = "DESCRIPTION")
 	private String description;
+
+	@Column(name = "CREATED_DATE")
+	@CreatedDate
+	private LocalDateTime createdDate = LocalDateTime.now();
+
+	@Column(name = "UPDATED_DATE")
+	@LastModifiedDate
+	private LocalDateTime updatedDate;
 
 	public static LeaveAndHoliday of(Event event, Member member, LeaveType leaveType) {
 
@@ -85,11 +103,13 @@ public class LeaveAndHoliday {
 	public static LeaveAndHoliday of(CreateLeaveRequestDto requestDto, Member member, String googleCalendarId) {
 
 		boolean isAllDay = DateUtils.determineAllDay(requestDto);
+		LocalDateTime starDateTime = DateUtils.makeLocalDateTimeFromLocalDAteAndLocalTime(requestDto.startDate(), requestDto.startTime());
+		LocalDateTime endDateTime = DateUtils.makeLocalDateTimeFromLocalDAteAndLocalTime(requestDto.endDate(), requestDto.endTime());
 
 		return LeaveAndHoliday.builder()
 			.title(requestDto.title())
-			.startDate(requestDto.startDate())
-			.endDate(requestDto.endDate())
+			.startDate(starDateTime)
+			.endDate(endDateTime)
 			.isAllDay(isAllDay)
 			.member(member)
 			.leaveType(requestDto.leaveType())
@@ -116,5 +136,11 @@ public class LeaveAndHoliday {
 		}
 		boolean isAllDay = DateUtils.determineAllDay(dto);
 		this.isAllDay = isAllDay;
+	}
+
+	// 최초 생성 시 updatedDate는 null로
+	@PrePersist // 영속화 되기 직전 한번만 실행
+	public void onPrePersist() {
+		this.updatedDate = null;
 	}
 }
