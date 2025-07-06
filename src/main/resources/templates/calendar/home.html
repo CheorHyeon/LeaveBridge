@@ -69,12 +69,9 @@
                     <input type="text" class="form-control" id="inputTitle" name="title" placeholder="박철현 연차" required>
                 </div>
 
-                <!-- 숨겨진 필드로 false 기본값 지정 -->
-                <input type="hidden" name="allDay" value="false">
                 <!-- 종일 체크박스 -->
                 <div class="form-check mb-3">
-                    <input class="form-check-input" type="checkbox" value="true" id="allDayCheck" name="isAllDay"
-                           checked>
+                    <input class="form-check-input" type="checkbox" id="allDayCheck" name="isAllDay" value="true">
                     <label class="form-check-label" for="allDayCheck">
                         하루 종일 여부(All Day)
                     </label>
@@ -92,7 +89,7 @@
                         <option value="NON_DEDUCTIBLE">비차감 휴가(공가)</option>
                         <option value="MEETING">회의</option>
                     </select>
-                    <div class="form-text text-muted">
+                    <div class="form-text fw-bold">
                         한 번에 하나의 연차 타입만 등록 가능합니다. 다른 타입은 별도 등록해 주세요.
                     </div>
                 </div>
@@ -102,6 +99,7 @@
                     <div class="col">
                         <label for="inputStartDate" class="form-label">시작 날짜</label>
                         <input type="date" class="form-control" id="inputStartDate" name="startDate" required>
+                        <div class="invalid-feedback">시작 날짜는 종료 날짜보다 빠를 수 없습니다.</div>
                     </div>
                     <div class="col">
                         <label for="inputEndDate" class="form-label">종료 날짜</label>
@@ -113,24 +111,25 @@
                 <div class="row mb-3" id="timeGroup" style="display: none;">
                     <div class="col">
                         <label for="inputStartTime" class="form-label">시작 시간</label>
-                        <input type="time" class="form-control" id="inputStartTime" name="startTime" value="00:00">
+                        <input type="time" class="form-control" id="inputStartTime" name="startTime">
+                        <div class="invalid-feedback">시작 시간은 종료 시간보다 빠를 수 없습니다.</div>
                     </div>
                     <div class="col">
                         <label for="inputEndTime" class="form-label">종료 시간</label>
-                        <input type="time" class="form-control" id="inputEndTime" name="endTime" value="23:59">
+                        <input type="time" class="form-control" id="inputEndTime" name="endTime">
                     </div>
                 </div>
                 <!-- 비고 -->
                 <div class="mb-3">
                     <label for="inputDescription" class="form-label">비고</label>
                     <textarea class="form-control" id="inputDescription" name="description" rows="3"
-                              placeholder="공결 사유 등 입력(꼭 필요한 경우만 - 개인 연차 사용 미입력)"></textarea>
+                              placeholder="공가 사유 등 입력(꼭 필요한 경우만 - 개인 연차 사용 미입력)"></textarea>
                 </div>
             </div>
             <div class="modal-footer">
                 <!-- <button> 요소에 type 속성을 명시하지 않으면 HTML5 기준에서 type="submit"이 디폴트 적용 -->
                 <button type="submit" class="btn btn-primary" id="submitBtn">일정 등록</button>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">등록 취소</button>
+                <button type="button" class="btn btn-secondary" id="cancelBtn" data-bs-dismiss="modal">등록 취소</button>
             </div>
         </form>
     </div>
@@ -295,6 +294,14 @@
             timeGroup.style.display = 'none';
             startTime.required = false;
             endTime.required = false;
+
+            // 범위·값 모두 제거
+            startTime.value = '';
+            endTime.value   = '';
+            startTime.removeAttribute('min');
+            startTime.removeAttribute('max');
+            endTime.removeAttribute('min');
+            endTime.removeAttribute('max');
         } else {
             // 시간 지정: 시간 입력 보이기
             timeGroup.style.display = '';
@@ -303,12 +310,12 @@
         }
     }
 
+    const allDayCheck = document.getElementById('allDayCheck');
     allDayCheck.addEventListener('change', onModifyToggleAllDayChange);
 
     document.addEventListener('DOMContentLoaded', () => {
         // 1) 요소 조회
         const leaveTypeEl = document.getElementById('leaveType');
-        const allDayCheck = document.getElementById('allDayCheck');
         const timeGroup = document.getElementById('timeGroup');
         const startTimeEl = document.getElementById('inputStartTime');
         const endTimeEl = document.getElementById('inputEndTime');
@@ -316,84 +323,180 @@
         const formModal = new bootstrap.Modal(document.getElementById('eventFormModal'));
         const calendarEl = document.getElementById('calendar');
         const submitBtn = document.getElementById('submitBtn');
+        const cancelBtn = document.getElementById('cancelBtn');
+        const editBtn     = document.getElementById('modalEditBtn');
+        const titleInput  = document.getElementById('inputTitle');
+        const startDateEl = document.getElementById('inputStartDate');
+        const endDateEl = document.getElementById('inputEndDate');
+        const detailEventModal = new bootstrap.Modal(document.getElementById('eventDetailModal'));
+        const eventForm = document.getElementById('eventForm');
+
+        let currentEventId = null;  // 수정 중인 이벤트 ID 보관
 
         allDayCheck.addEventListener('change', onModifyToggleAllDayChange);
+
+        function resetValidation() {
+            // invalid 클래스를 모두 제거
+            eventForm.querySelectorAll('.is-invalid').forEach(el => {
+                el.classList.remove('is-invalid');
+            });
+
+            // 각 필드의 customValidity 도 초기화
+            [startDateEl, endDateEl, startTimeEl, endTimeEl].forEach(el => {
+                el.setCustomValidity('');
+            });
+        }
+
+        // 모달 DOM 요소
+        const eventFormModalEl = document.getElementById('eventFormModal');
+        // 폼 모달 닫기 버튼 눌렀을때도 validation 초기화
+        eventFormModalEl.addEventListener('hidden.bs.modal', resetValidation);
+
+        let anchorDate = null;         // 폼이 열릴 때 클릭한 날짜 기억
 
         // 3) leaveType 변경 시 UI 조정
         function onLeaveTypeChange() {
             const currentType = leaveTypeEl.value;
 
-            // 0) 유형이 기본값(빈 문자열)일 때
-            if (currentType === "") {
-                // 종일 체크박스 활성화 / 체크 가능
-                allDayCheck.disabled = false;
-                allDayCheck.checked  = true;
-                // 시간 그룹 숨기기
-                timeGroup.style.display = 'none';
-                startTimeEl.required = false;
-                endTimeEl.required   = false;
-                // 비고 필수 해제
-                descriptionEl.required = false;
-                return;  // 여기서 끝내고 switch 문은 타지 않음
-            }
-
-            // 기본 리셋
+            // 0) 기본 리셋 (페어된 로직만 남김)
             allDayCheck.disabled = false;
-            allDayCheck.checked = true;
+            startTimeEl.required = false;
+            endTimeEl.required   = false;
+            allDayCheck.checked  = true;
             timeGroup.style.display = 'none';
+            startDateEl.readOnly = false;
+            endDateEl.readOnly   = false;
             startTimeEl.readOnly = false;
-            endTimeEl.readOnly = false;
+            endTimeEl.readOnly   = false;
+            descriptionEl.required = false;
             startTimeEl.removeAttribute('min');
             startTimeEl.removeAttribute('max');
             endTimeEl.removeAttribute('min');
             endTimeEl.removeAttribute('max');
-            descriptionEl.required = false;
 
+            // ✅ 반차·외출 3종은 “클릭한 날” 하루로 고정
+            const isHalfOrOuting = ['HALF_DAY_MORNING', 'HALF_DAY_AFTERNOON', 'OUTING']
+                .includes(currentType);
+
+            if (isHalfOrOuting && anchorDate) {     // dateClick 으로 열린 경우에만
+                startDateEl.value  = anchorDate;
+                endDateEl.value    = anchorDate;
+                startDateEl.readOnly = true;
+                endDateEl.readOnly   = true;
+            }
+
+
+            // 1) 타입별 고유 설정
             switch (currentType) {
+                case '':
+                    allDayCheck.checked = true;
+                    startTimeEl.required = false;
+                    endTimeEl.required   = false;
+                    return;
+
                 case 'FULL_DAY_LEAVE':
                 case 'SUMMER_VACATION':
                     allDayCheck.checked = true;
                     allDayCheck.disabled = true;
                     startTimeEl.value = '00:00';
                     endTimeEl.value   = '23:59';
+                    startDateEl.readOnly = false;
+                    endDateEl.readOnly   = false;
                     break;
+
                 case 'HALF_DAY_MORNING':
                     allDayCheck.checked = false;
                     allDayCheck.disabled = true;
                     timeGroup.style.display = '';
                     startTimeEl.value = '08:00';
-                    endTimeEl.value = '13:00';
+                    endTimeEl.value   = '13:00';
+                    startDateEl.readOnly = true;
+                    endDateEl.readOnly   = true;
                     startTimeEl.readOnly = true;
-                    endTimeEl.readOnly = true;
-                    break;
+                    endTimeEl.readOnly   = true;
+                    return;  // 범위 세팅도 필요 없으니 리턴
+
                 case 'HALF_DAY_AFTERNOON':
                     allDayCheck.checked = false;
                     allDayCheck.disabled = true;
                     timeGroup.style.display = '';
                     startTimeEl.value = '13:00';
-                    endTimeEl.value = '17:00';
+                    endTimeEl.value   = '17:00';
+                    startDateEl.readOnly = true;
+                    endDateEl.readOnly   = true;
                     startTimeEl.readOnly = true;
-                    endTimeEl.readOnly = true;
-                    break;
+                    endTimeEl.readOnly   = true;
+                    return;
+
                 case 'OUTING':
                     allDayCheck.checked = false;
                     allDayCheck.disabled = true;
                     timeGroup.style.display = '';
+                    startDateEl.readOnly = true;
+                    endDateEl.readOnly   = true;
                     startTimeEl.min = '08:00';
                     startTimeEl.max = '17:00';
-                    endTimeEl.min = '08:00';
-                    endTimeEl.max = '17:00';
+                    endTimeEl.min   = '08:00';
+                    endTimeEl.max   = '17:00';
                     break;
+
                 case 'NON_DEDUCTIBLE':
-                case 'MEETING':
-                    descriptionEl.required = true;
+                    // 범위만 공통 적용, 나머지 기본 동작 유지
+                    descriptionEl.required = true
                     break;
+
+                case 'MEETING':
+                    break;
+
                 default:
                     break;
             }
+
         }
 
         leaveTypeEl.addEventListener('change', onLeaveTypeChange);
+
+        // “수정” 버튼 클릭 핸들러
+        editBtn.addEventListener('click', (e) => {
+            // 상세 모달 닫기
+            detailEventModal.hide();
+            const eventId = e.currentTarget.getAttribute('data-event-id');
+
+            // 기존 입력 모달 초기화
+            document.getElementById('eventForm').reset();
+            resetValidation();
+            submitBtn.disabled = false;
+
+            // 모드 전환
+            document.getElementById('formModalTitle').textContent = '일정 수정';
+            submitBtn.textContent = '수정하기';
+            cancelBtn.textContent = '수정취소'
+
+
+            fetch(`/api/v1/calendar/events/${eventId}`)
+                .then(res => res.json())
+                .then(evt => {
+                    // 2) 폼 필드에 값 채우기
+                    titleInput.value       = evt.title;
+                    leaveTypeEl.value      = evt.leaveType;
+                    startDateEl.value      = evt.startDate.slice(0,10);
+                    endDateEl.value        = evt.endDate.slice(0,10);
+                    if (!evt.isAllDay) {
+                        allDayCheck.checked     = false;
+                        startTimeEl.value     = evt.startDate.slice(11,16);
+                        endTimeEl.value       = evt.endDate.slice(11,16);
+                    } else {
+                        allDayCheck.checked     = true;
+                    }
+                    descriptionEl.value           = evt.description || '';
+
+                    // 3) onLeaveTypeChange 등 UI 토글 함수 호출
+                    onLeaveTypeChange();
+
+                    formModal.show();
+                })
+                .catch(console.error);
+        });
 
         // 4) FullCalendar 초기화
         let calendar = new FullCalendar.Calendar(calendarEl, {
@@ -457,11 +560,10 @@
 
             // event 클릭 함수 정의 -> 일정 정보 (수정, 삭제 가능하도록)
             eventClick: function (info) {
-                // 클릭된 이벤트의 ID 추출
-                const eventId = info.event.id;
+                currentEventId = info.event.id;
 
                 // 서버에서 상세 정보 불러오기
-                fetch(`/api/v1/calendar/events/${eventId}`)
+                fetch(`/api/v1/calendar/events/${currentEventId}`)
                     .then(response => {
                         if (!response.ok) throw new Error('네트워크 응답 실패');
                         return response.json();
@@ -473,12 +575,11 @@
                         document.getElementById('modalEnd').textContent = formatKoreanDateTime(data.endDate);
                         document.getElementById('modalDescription').textContent = data.description || '설명 없음';
 
-                        // 수정 버튼에 링크 설정 (원하면)
-                        document.getElementById('modalEditBtn').href = `/events/edit/${eventId}`;
+                        // 수정 버튼에 eventId 속성으로 넣기
+                        document.getElementById('modalEditBtn').setAttribute('data-event-id', currentEventId);
 
                         // Bootstrap 모달 표시
-                        const modal = new bootstrap.Modal(document.getElementById('eventDetailModal'));
-                        modal.show();
+                        detailEventModal.show();
                     })
                     .catch(err => {
                         console.error('이벤트 상세 조회 중 오류:', err);
@@ -488,10 +589,17 @@
 
             // 날짜나 시간 클릭 시 발생 -> 일정 생성 폼 등록
             dateClick: function (info) {
+                // 등록 모드 진입 시 기존 ID 초기화
+                currentEventId = null;
+                // 전역 변수에 클릭한 날짜 저장
+                anchorDate = info.dateStr;
                 // 1) 모달 제목 설정 (등록 모드)
                 document.getElementById('formModalTitle').textContent = '일정 등록';
+                submitBtn.textContent = '등록하기';
+                cancelBtn.textContent = '등록취소';
                 // 2) 폼 리셋 & 일정 등록 버튼 활성화
                 document.getElementById('eventForm').reset();
+                resetValidation();
                 submitBtn.disabled = false
                 // 3) “종일” 체크 & 토글
                 const allDayCheck = document.getElementById('allDayCheck');
@@ -523,13 +631,54 @@
             calendar.refetchEvents();
         }
 
+        // ➊ 검증 함수
+        function validateDateTime() {
+            const sd = startDateEl.value;        // "2025-07-30"
+            const ed = endDateEl.value;          // ""
+            const st = startTimeEl.value;        // "13:00"
+            const et = endTimeEl.value;
+
+            // 1) 날짜 비교
+            if (sd && ed && sd > ed) {           // YYYY-MM-DD는 문자열 비교 OK
+                startDateEl.setCustomValidity('invalid-date');
+                startDateEl.classList.add('is-invalid');
+                return false;
+            }
+            // 2) 시간 비교 (allDay 아니어야 함)
+            if (!allDayCheck.checked && st && et && st >= et) {
+                startTimeEl.setCustomValidity('invalid-time');
+                startTimeEl.classList.add('is-invalid');
+                return false;
+            }
+
+            /* 모두 통과 → 기존 오류 리셋 */
+            [startDateEl, startTimeEl].forEach(el => {
+                el.setCustomValidity('');
+                el.classList.remove('is-invalid');
+            });
+            return true;
+        }
 
         // 폼 제출 이벤트 잡기 - form 태그 안에 button 있으면 제출
-        const eventForm = document.getElementById('eventForm');
         eventForm.addEventListener('submit', function (e) {
             e.preventDefault();
+
+            if (!validateDateTime()) {
+                // HTML5 기본 메시지 대신 invalid-feedback 이 보여짐
+                eventForm.reportValidity();        // 포커스 이동 + 빨간 테두리
+                return;                            // Fetch 보내지 않음
+            }
+
+            const url    = currentEventId
+                ? `/api/v1/calendar/events/${currentEventId}`
+                : '/api/v1/calendar/events';
+            const method = currentEventId ? 'PATCH' : 'POST';
+
             const formData = new FormData(eventForm);
             const dataObj = Object.fromEntries(formData.entries());
+
+            // 2) allDay 키가 없으면 기본 false 주입 (문자열 → boolean 변환 포함)
+            dataObj.isAllDay = document.getElementById('allDayCheck').checked; // true / false
 
             // 2) 등록 버튼 비활성화
             submitBtn.disabled = true;
@@ -544,30 +693,26 @@
                 fetchHeaders[header] = token;
             }
 
-            fetch('/api/v1/calendar/events', {
-                method: 'POST',
+            fetch(url, {
+                method: method,
                 headers: fetchHeaders,
                 body: JSON.stringify(dataObj)
             })
                 .then(res => {
                     if (!res.ok) throw new Error('서버 오류');
-                    // 204나 빈 바디일 때는 JSON 파싱 건너뛰기
-                    if (res.status === 204 || res.headers.get('Content-Length') === '0') {
-                        return null;
-                    }
-                    return res.json();
+                    return res.json().catch(() => null);
                 })
                 .then(() => {
-                    // ② 등록 성공: 모달 닫고, 캘린더 이벤트 새로 불러오기
+                    currentEventId = null;
                     closeEventFormModal();      // 모달 닫기
                     refreshCalendarEvents();    // 캘린더 갱신
                 })
                 .catch(err => {
-                    // ③ 실패: 토스트 띄우기
                     console.error(err);
-                    // 3) 실패 → 버튼 재활성화
+                    alert('요청에 실패했습니다.');
+                })
+                .finally(() => {
                     submitBtn.disabled = false;
-                    alert('등록에 실패했습니다. 다시 시도해 주세요.');
                 });
         });
 
