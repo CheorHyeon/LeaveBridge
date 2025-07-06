@@ -29,8 +29,8 @@ public record MonthlyEvent(
 		return MonthlyEvent.builder()
 			.id(leaveAndHoliday.getId())
 			.title(leaveAndHoliday.getTitle())
-			.start(leaveAndHoliday.getStartDate())
-			.end(leaveAndHoliday.getEndDate())
+			.start(LocalDateTime.of(leaveAndHoliday.getStartDate(), leaveAndHoliday.getStarTime()))
+			.end(LocalDateTime.of(leaveAndHoliday.getEndDate(), leaveAndHoliday.getEndTime()))
 			.allDay(leaveAndHoliday.getIsAllDay())
 			.build();
 	}

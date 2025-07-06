@@ -8,9 +8,6 @@ import java.util.Objects;
 
 import com.google.api.services.calendar.model.Event;
 import com.google.api.services.calendar.model.EventDateTime;
-import com.leavebridge.calendar.dto.CreateLeaveRequestDto;
-import com.leavebridge.calendar.dto.PatchLeaveRequestDto;
-import com.leavebridge.calendar.enums.LeaveType;
 
 public class DateUtils {
 
@@ -22,7 +19,7 @@ public class DateUtils {
 	 * @return 변환된 LocalDateTime
 	 */
 	public static LocalDateTime parseDateTime(EventDateTime dt, boolean isStart) {
-		// 1) 시간이 명시된 경우
+		// 1) 시간이 명시된 경우 - all day 이벤트가 아님
 		if (dt.getDateTime() != null) {
 			return convertToLocalDateTime(dt.getDateTime().getValue());
 		}
@@ -31,7 +28,7 @@ public class DateUtils {
 		// 시작이면 자정, 종료면 당일 23:59:59
 		return isStart
 			? date.atStartOfDay()
-			: date.atStartOfDay().minusNanos(1);  // all-day 이벤트의 경우 다음날 00:00:00 이기 때문에 1초 빼기
+			: date.atStartOfDay().minusSeconds(1);  // all-day 이벤트의 경우 다음날 00:00:00 이기 때문에 1초 빼기
 	}
 
 	/**
@@ -61,49 +58,10 @@ public class DateUtils {
 	 */
 	public static LocalDateTime makeLocalDateTimeFromLocalDAteAndLocalTime(LocalDate date, LocalTime time) {
 		if (Objects.isNull(date)) {
-			return null;
+			throw new IllegalArgumentException("date cannot be null");
 		}
 		return Objects.isNull(time)
 			? date.atStartOfDay()
 			: LocalDateTime.of(date, time);
-	}
-
-	/**
-	 * Create DTO 전용 래퍼
-	 */
-	public static boolean determineAllDay(CreateLeaveRequestDto dto) {
-		LocalDateTime starDateTime = DateUtils.makeLocalDateTimeFromLocalDAteAndLocalTime(dto.startDate(), dto.startTime());
-		LocalDateTime endDateTime = DateUtils.makeLocalDateTimeFromLocalDAteAndLocalTime(dto.endDate(), dto.endTime());
-
-		return isAllDay(dto.leaveType(), starDateTime, endDateTime);
-	}
-
-	/**
-	 * Patch DTO 전용 래퍼
-	 */
-	public static boolean determineAllDay(PatchLeaveRequestDto dto) {
-		return isAllDay(dto.leaveType(), dto.startDate(), dto.endDate());
-	}
-
-	/**
-	 * 공통 로직: leaveType, 시작·종료 시각으로 all-day 여부 판정
-	 */
-	private static boolean isAllDay(LeaveType type, LocalDateTime start, LocalDateTime end) {
-		// 1) FULL_DAY_LEAVE, SUMMER_VACATION, HOLIDAY 은 무조건 종일
-		if (type == LeaveType.FULL_DAY_LEAVE
-			|| type == LeaveType.SUMMER_VACATION
-			|| type == LeaveType.HOLIDAY) {
-			return true;
-		}
-
-		// 2) 같은 날, 08시 시작 & 17시 이후 종료면 종일
-		if (start.toLocalDate().equals(end.toLocalDate())
-			&& start.getHour() == 8
-			&& end.getHour() >= 17) {
-			return true;
-		}
-
-		// 그 외는 종일 아님
-		return false;
 	}
 }
