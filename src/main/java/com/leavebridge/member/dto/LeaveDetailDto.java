@@ -31,8 +31,8 @@ public record LeaveDetailDto(
 			.id(leaveAndHoliday.getId())
 			.title(leaveAndHoliday.getTitle())
 			.description(leaveAndHoliday.getDescription())
-			.start(leaveAndHoliday.getStartDate())
-			.end(leaveAndHoliday.getEndDate())
+			.start(LocalDateTime.of(leaveAndHoliday.getStartDate(), leaveAndHoliday.getStarTime()))
+			.end(LocalDateTime.of(leaveAndHoliday.getEndDate(), leaveAndHoliday.getEndTime()))
 			.usedDays(usedDays)
 			.leaveType(leaveAndHoliday.getLeaveType())
 			.build();

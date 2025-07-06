@@ -8,3 +8,9 @@ spring:
       ddl-auto: none
   thymeleaf:
     cache: false   # 템플릿 캐싱 비활성화 (개발 환경에서만)
+    prefix: file:src/main/resources/templates/
+  devtools:
+    livereload:
+      enabled: true
+    restart:
+      enabled: true

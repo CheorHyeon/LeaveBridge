@@ -1,6 +1,7 @@
 package com.leavebridge.calendar.service;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Date;
@@ -12,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
+import com.google.api.client.util.Data;
 import com.google.api.client.util.DateTime;
 import com.google.api.services.calendar.Calendar;
 import com.google.api.services.calendar.model.Event;
@@ -58,8 +60,8 @@ public class CalendarService {
 	public List<MonthlyEvent> listMonthlyEvents(int year, int month) throws Exception {
 		log.info("CalendarService.listMonthlyEvents :: year={}, month={}", year, month);
 
-		LocalDateTime startDate = LocalDateTime.of(year, month, 1, 1, 0, 0);
-		LocalDateTime endDate = startDate.plusMonths(1);  // 다음 달 1일 00:00
+		LocalDate startDate = LocalDate.of(year, month, 1);
+		LocalDate endDate = startDate.plusMonths(1);  // 다음 달 1일 00:00
 
 		// 시작일이 지정한 날짜 이상인 것
 		List<LeaveAndHoliday> currentMonthEvents = leaveAndHolidayRepository.findAllByStartDateGreaterThanEqualAndStartDateLessThan(
@@ -80,8 +82,6 @@ public class CalendarService {
 		// 1) Event 객체 생성 및 기본 정보 설정
 		Event event = new Event().setSummary(requestDto.title());
 
-		boolean isAllDay = DateUtils.determineAllDay(requestDto);
-
 		LocalDateTime startLdt = DateUtils.makeLocalDateTimeFromLocalDAteAndLocalTime(
 			requestDto.startDate(), requestDto.startTime());
 
@@ -89,7 +89,7 @@ public class CalendarService {
 			requestDto.endDate(), requestDto.endTime());
 
 		// 3) 구글 캘린더에 보낼 start/end 설정
-		if (isAllDay) {
+		if (requestDto.isAllDay()) {
 			// 날짜 전용 (종일 이벤트)
 			event.setStart(new EventDateTime().setDate(new DateTime(requestDto.startDate().toString())));
 			// 종료는 “다음 날” 날짜만 넘김
@@ -173,61 +173,133 @@ public class CalendarService {
 	}
 
 	/**
-	 * apiEvent 에 dto 의 변경값(summary, description, startDate, endDate)을
-	 * 실제로 달라졌을 때만 적용하고, 하나라도 바뀌면 true 반환
+	 * apiEvent에 dto의 변경값을 적용하고, 하나라도 바뀌면 true 반환
 	 */
 	private boolean applyAllChanges(Event apiEvent, PatchLeaveRequestDto dto) {
 		boolean changed = false;
+		// |= 복합대입 연산자 사용해서 true가 한번이라도 나오면 무조건 true로 반환하도록
 
-		// --- 1) summary(제목) 검사/적용 ---
-		if (StringUtils.hasText(dto.title())) {
-			String curTitle = apiEvent.getSummary();
-			if (!dto.title().equals(curTitle)) {
-				apiEvent.setSummary(dto.title());
-				changed = true;
-			}
-		}
+		// 1) summary(제목) 검사/적용
+		changed |= updateSummaryIfChanged(apiEvent, dto);
 
-		// --- 2) description(설명) 검사/적용 ---
-		if (StringUtils.hasText(dto.description())) {
-			String curDesc = apiEvent.getDescription();
-			if (!dto.description().equals(curDesc)) {
-				apiEvent.setDescription(dto.description());
-				changed = true;
-			}
-		}
+		// 2) description(설명) 검사/적용
+		changed |= updateDescriptionIfChanged(apiEvent, dto);
 
-		// --- 3) startDate 검사/적용 ---
-		if (dto.startDate() != null) {
-			LocalDateTime newStart = dto.startDate();
-			DateTime curDt = apiEvent.getStart().getDateTime();
-			LocalDateTime curStart = DateUtils.convertToLocalDateTime(curDt.getValue());
-			if (!curStart.equals(newStart)) {
-				apiEvent.setStart(new EventDateTime()
-					.setDateTime(new DateTime(
-						Date.from(newStart.atZone(ZoneId.of(DEFAULT_TIME_ZONE)).toInstant())
-					))
-				);
-				changed = true;
-			}
-		}
-
-		// --- 4) endDate 검사/적용 ---
-		if (dto.endDate() != null) {
-			LocalDateTime newEnd = dto.endDate();
-			DateTime curDt = apiEvent.getEnd().getDateTime();
-			LocalDateTime curEnd = DateUtils.convertToLocalDateTime(curDt.getValue());
-			if (!curEnd.equals(newEnd)) {
-				apiEvent.setEnd(new EventDateTime()
-					.setDateTime(new DateTime(
-						Date.from(newEnd.atZone(ZoneId.of(DEFAULT_TIME_ZONE)).toInstant())
-					))
-				);
-				changed = true;
-			}
-		}
+		// 3) start/end DateTime 업데이트
+		changed |= updateDateTimeIfChanged(apiEvent, dto);
 
 		return changed;
+	}
+
+	/**
+	 * 제목 업데이트
+	 */
+	private boolean updateSummaryIfChanged(Event apiEvent, PatchLeaveRequestDto dto) {
+		if (StringUtils.hasText(dto.title()) && !dto.title().equals(apiEvent.getSummary())) {
+			apiEvent.setSummary(dto.title());
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * 설명 업데이트
+	 */
+	private boolean updateDescriptionIfChanged(Event apiEvent, PatchLeaveRequestDto dto) {
+		if (StringUtils.hasText(dto.description()) && !dto.description().equals(apiEvent.getDescription())) {
+			apiEvent.setDescription(dto.description());
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * 현재 apiEvent 에 dto 로 받은 날짜/시간을 반영한다.
+	 * 변경이 있었으면 true, 없으면 false
+	 */
+	private boolean updateDateTimeIfChanged(Event apiEvent, PatchLeaveRequestDto dto) {
+
+		ZoneId zone = ZoneId.of(DEFAULT_TIME_ZONE);
+
+		// ---------- 1) DTO → 목표 값 계산 ----------
+		boolean wantedAllDay = Boolean.TRUE.equals(dto.isAllDay());
+
+		LocalDateTime wantedStart = wantedAllDay
+			? dto.startDate().atStartOfDay()
+			: LocalDateTime.of(dto.startDate(), dto.startTime());
+
+		LocalDateTime wantedEnd = wantedAllDay
+			? dto.endDate().plusDays(1).atStartOfDay()       // ★ 전일은 +1day 00:00
+			: LocalDateTime.of(dto.endDate(), dto.endTime());
+
+		// ---------- 2) 현재 값 가져오기 ----------
+		boolean currentAllDay = apiEvent.getStart().getDate() != null;
+
+		LocalDateTime currentStart;
+		LocalDateTime currentEnd;
+
+		if (currentAllDay) {
+    /* 전일 일정 ─ start·end 에는 '날짜만' 들어 있으므로
+       → LocalDate 로 파싱한 뒤 자정으로 맞춰 LocalDateTime 생성 */
+			currentStart = LocalDate
+				.parse(apiEvent.getStart().getDate().toString())   // "2025-07-28"
+				.atStartOfDay();                                   // 2025-07-28T00:00
+			currentEnd   = LocalDate
+				.parse(apiEvent.getEnd().getDate().toString())     // 구글은 다음날 00:00 저장
+				.atStartOfDay();                                   // 2025-07-29T00:00
+		} else {
+			/* 시간 지정 일정 ─ millisecond epoch 값 → LocalDateTime */
+			currentStart = DateUtils.convertToLocalDateTime(apiEvent.getStart().getDateTime().getValue());
+			currentEnd   = DateUtils.convertToLocalDateTime(apiEvent.getEnd().getDateTime().getValue());
+		}
+
+		// ---------- 3) 변동 여부 확인 ----------
+		// 하루종일 일정 == 바꿀일정도 하루종일 일정 & 일자도 같다 -> 변동 없음
+		if (wantedAllDay == currentAllDay && wantedStart.equals(currentStart) && wantedEnd.equals(currentEnd)) {
+			return false;
+		}
+
+		// ---------- 4) EventDateTime 새로 만들어 교체 ----------
+		// 하루종일 일정으로 변경하고싶다 -> 새로운날의 하루종일 일정으로 변경
+		if (wantedAllDay) {
+
+			// 전일(all-day)로 바꿔야 할 경우 - 기존꺼에 업데이트 하기 때문에 Null 확실하게 처리해야 함
+			EventDateTime newStart = new EventDateTime()
+				.setDateTime(Data.NULL_DATE_TIME)   // 👈 반드시 포함
+				.setTimeZone(null)
+				.setDate(
+					new DateTime(wantedStart.toLocalDate().toString())
+				);
+
+			EventDateTime newEnd = new EventDateTime()
+				.setDateTime(Data.NULL_DATE_TIME)
+				.setTimeZone(null)
+				.setDate(
+					new DateTime(wantedEnd.toLocalDate().toString())
+				);
+
+			apiEvent.setStart(newStart);
+			apiEvent.setEnd(newEnd);
+		}
+		// 바꿀 일정이 하루종일이 아닌거로 바뀔경우 -> 새로운거로 변경
+		else {
+			DateTime startDt = new DateTime(
+				Date.from(wantedStart.atZone(zone).toInstant())); // 2025-07-28T13:00:00+09:00
+			DateTime endDt   = new DateTime(
+				Date.from(wantedEnd.atZone(zone).toInstant()));   // 2025-07-28T17:00:00+09:00
+
+			apiEvent.setStart(new EventDateTime()
+				.setDate(Data.NULL_DATE_TIME)            // date 필드 제거(시간 지정 이벤트이므로)
+				.setDateTime(startDt)
+				.setTimeZone(zone.getId()));
+
+			apiEvent.setEnd(new EventDateTime()
+				.setDate(Data.NULL_DATE_TIME)
+				.setDateTime(endDt)
+				.setTimeZone(zone.getId()));
+		}
+
+		return true;
 	}
 
 	/**

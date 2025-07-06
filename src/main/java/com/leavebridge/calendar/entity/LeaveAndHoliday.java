@@ -1,6 +1,8 @@
 package com.leavebridge.calendar.entity;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
@@ -41,6 +43,9 @@ import lombok.ToString;
 @EntityListeners(AuditingEntityListener.class)
 public class LeaveAndHoliday {
 
+	public static final LocalTime WORK_START_TIME = LocalTime.of(8, 0);
+	public static final LocalTime WORK_END_TIME = LocalTime.of(17, 0);
+
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	@Column(name = "ID")
@@ -50,10 +55,16 @@ public class LeaveAndHoliday {
 	private String title;
 
 	@Column(name = "START_DATE")
-	private LocalDateTime startDate;
+	private LocalDate startDate;
+
+	@Column(name = "START_TIME")
+	private LocalTime starTime;
 
 	@Column(name = "END_DATE")
-	private LocalDateTime endDate;
+	private LocalDate endDate;
+
+	@Column(name = "END_TIME")
+	private LocalTime endTime;
 
 	@Column(name = "IS_ALL_DAY")
 	private Boolean isAllDay;
@@ -90,8 +101,10 @@ public class LeaveAndHoliday {
 
 		return LeaveAndHoliday.builder()
 			.title(event.getSummary())
-			.startDate(start)
-			.endDate(end)
+			.startDate(start.toLocalDate())
+			.starTime(start.toLocalTime())
+			.endDate(end.toLocalDate())
+			.endTime(end.toLocalTime())
 			.isAllDay(isAllDay)
 			.member(member)
 			.leaveType(leaveType)
@@ -102,15 +115,16 @@ public class LeaveAndHoliday {
 
 	public static LeaveAndHoliday of(CreateLeaveRequestDto requestDto, Member member, String googleCalendarId) {
 
-		boolean isAllDay = DateUtils.determineAllDay(requestDto);
 		LocalDateTime starDateTime = DateUtils.makeLocalDateTimeFromLocalDAteAndLocalTime(requestDto.startDate(), requestDto.startTime());
 		LocalDateTime endDateTime = DateUtils.makeLocalDateTimeFromLocalDAteAndLocalTime(requestDto.endDate(), requestDto.endTime());
 
 		return LeaveAndHoliday.builder()
 			.title(requestDto.title())
-			.startDate(starDateTime)
-			.endDate(endDateTime)
-			.isAllDay(isAllDay)
+			.startDate(starDateTime.toLocalDate())
+			.starTime(starDateTime.toLocalTime())
+			.endDate(endDateTime.toLocalDate())
+			.endTime(endDateTime.toLocalTime())
+			.isAllDay(requestDto.isAllDay())
 			.member(member)
 			.leaveType(requestDto.leaveType())
 			.googleEventId(googleCalendarId)
@@ -122,20 +136,33 @@ public class LeaveAndHoliday {
 		if (dto.title() != null) {
 			this.title = dto.title();
 		}
-		if (dto.startDate() != null) {
-			this.startDate = dto.startDate();
+
+		if(dto.isAllDay() != null) {
+			this.isAllDay = dto.isAllDay();
 		}
-		if (dto.endDate() != null) {
-			this.endDate = dto.endDate();
-		}
-		if (dto.leaveType() != null) {
-			this.leaveType = dto.leaveType();
-		}
+
 		if (dto.description() != null) {
 			this.description = dto.description();
 		}
-		boolean isAllDay = DateUtils.determineAllDay(dto);
-		this.isAllDay = isAllDay;
+
+		if (dto.startDate() != null) {
+			this.startDate = dto.startDate();
+		}
+
+		if(dto.startTime() != null) {
+			this.starTime = dto.startTime();
+		}
+
+		if (dto.endDate() != null) {
+			this.endDate = dto.endDate();
+		}
+
+		if(dto.endTime() != null) {
+			this.endTime = dto.endTime();
+		}
+
+		// 설명은 null로 고칠수도 있으니 열어둠
+		this.leaveType = dto.leaveType();
 	}
 
 	// 최초 생성 시 updatedDate는 null로

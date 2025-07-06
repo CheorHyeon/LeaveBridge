@@ -11,7 +11,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.leavebridge.calendar.entity.LeaveAndHoliday;
-import com.leavebridge.calendar.enums.LeaveType;
 import com.leavebridge.calendar.repository.LeaveAndHolidayRepository;
 import com.leavebridge.member.dto.LeaveDetailDto;
 import com.leavebridge.member.dto.MemberUsedLeavesResponseDto;
@@ -93,8 +92,8 @@ public class MemberService {
 			return 0.0;
 		}
 
-		LocalDateTime start = leaveAndHoliday.getStartDate();
-		LocalDateTime end = leaveAndHoliday.getEndDate();
+		LocalDateTime start = LocalDateTime.of(leaveAndHoliday.getStartDate(), leaveAndHoliday.getStarTime());
+		LocalDateTime end = LocalDateTime.of(leaveAndHoliday.getEndDate(), leaveAndHoliday.getEndTime());
 
 		double totalMinutes = 0;
 
