@@ -55,6 +55,7 @@ public class CalendarController {
 	@PostMapping("/events")
 	public ResponseEntity<Void> createHolidays(@RequestBody CreateLeaveRequestDto createLeaveRequestDto) throws
 		Exception {
+		log.info("createHolidays :: createLeaveRequestDto = {}", createLeaveRequestDto );
 		calendarService.createTimedEvent(createLeaveRequestDto);
 		return ResponseEntity.ok().build();
 	}
@@ -65,6 +66,7 @@ public class CalendarController {
 	@PatchMapping("/events/{eventId}")
 	public ResponseEntity<Void> updateHolidays(@PathVariable("eventId") Long eventId,
 		@RequestBody PatchLeaveRequestDto patchLeaveRequestDto) throws IOException {
+		log.info("updateHolidays :: eventId={} patchLeaveRequestDto = {}", eventId, patchLeaveRequestDto );
 		calendarService.updateEventDate(eventId, patchLeaveRequestDto);
 		return ResponseEntity.ok().build();
 	}
