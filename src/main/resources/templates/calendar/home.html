@@ -10,6 +10,24 @@
             font-style: normal;
         }
 
+        .toast-progress {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+        }
+
+        /* 토스트 자체 둥근 모서리 & 최대 너비 */
+        #liveToast {
+            --bs-toast-border-radius: 1rem;        /* SCSS 변수 대체 가능  */
+            --bs-toast-max-width: 20rem;
+            border-radius: var(--bs-toast-border-radius);
+            max-width: var(--bs-toast-max-width);
+        }
+
+        .clickable-toast {
+            cursor: pointer;
+        }
+
         html * {
             font-family: 'Pretendard-Regular', sans-serif;
         }
@@ -239,6 +257,22 @@
 
 <div id='calendar'></div>
 
+<!-- 토스트 컨테이너: 우상단 고정 -->
+<div class="position-fixed top-0 end-0 p-3" style="z-index: 1200;">
+    <div id="liveToast" class="toast align-items-center border-0 clickable-toast"
+         role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex align-items-center px-4 py-3" id="toastContent">
+            <!-- 아이콘/메시지 영역 -->
+            <span id="toastIcon" class="me-2 fs-4"></span>
+            <div class="toast-body fw-semibold" id="toastBody">
+                <!-- 메시지 설정 -->
+            </div>
+        </div>
+        <!-- 진행 바 -->
+        <div class="toast-progress"
+             style="height:4px; width:100%; transition:width 3s linear;"></div>
+    </div>
+</div>
 <script>
 
     // Vanilla JS로 CSRF 메타 태그를 꺼내되, 없으면 빈 문자열('')
@@ -314,6 +348,57 @@
     allDayCheck.addEventListener('change', onModifyToggleAllDayChange);
 
     document.addEventListener('DOMContentLoaded', () => {
+        const toastEl = document.getElementById('liveToast');
+        if (!toastEl) return console.error('Toast element not found!');
+
+        // Bootstrap Toast 인스턴스 생성 (3초 후 자동 숨김)
+        const bsToast = new bootstrap.Toast(toastEl, {
+            delay: 3000,
+            autohide: true
+        });
+
+        // 토스트 클릭 시 자동으로 숨기기
+        toastEl.addEventListener('click', () => {
+            bsToast.hide();
+        });
+
+        // 메시지 및 스타일 설정 함수
+        window.showToast = (message, type = 'info') => {
+            const iconEl = document.getElementById('toastIcon');
+            const bodyEl = document.getElementById('toastBody');
+
+            // (1) 타입별 설정
+            const types = {
+                success: { bg: 'bg-success', text: 'text-white', icon: '✔️' },
+                error:   { bg: 'bg-danger',  text: 'text-white', icon: '❌' },
+                info:    { bg: 'bg-info',    text: 'text-white', icon: 'ℹ️' },
+                warning: { bg: 'bg-warning', text: 'text-dark',  icon: '⚠️' }
+            };
+            const cfg = types[type] || types.info;
+
+            // (2) 기존 색상 클래스 제거
+            Object.values(types).forEach(t => {
+                toastEl.classList.remove(t.bg, t.text);
+            });
+
+            // (3) 새 배경·텍스트 색상 클래스 추가
+            toastEl.classList.add(cfg.bg, cfg.text);
+
+            // (4) 아이콘·메시지 설정
+            iconEl.textContent = cfg.icon;
+            bodyEl.textContent = message;
+
+            // (5) 진행 바 리셋 및 애니메이션 재실행
+            const prog = toastEl.querySelector('.toast-progress');
+            prog.style.transition = 'none';
+            prog.style.width = '100%';
+            void prog.offsetWidth;                   // 강제 리플로우 (layout) :contentReference[oaicite:12]{index=12}
+            prog.style.transition = 'width 3s linear';
+            prog.style.width = '0%';
+
+            // (6) 토스트 표시
+            bsToast.show();                           // show()로 표시 :contentReference[oaicite:13]{index=13}
+        };
         // 1) 요소 조회
         const leaveTypeEl = document.getElementById('leaveType');
         const timeGroup = document.getElementById('timeGroup');
@@ -596,7 +681,7 @@
                     })
                     .catch(err => {
                         console.error('이벤트 상세 조회 중 오류:', err);
-                        alert('이벤트 정보를 불러오는 데 실패했습니다.');
+                        showToast('이벤트 정보를 불러오는 데 실패했습니다.', 'error');
                     });
             },
 
@@ -716,13 +801,14 @@
                     return res.json().catch(() => null);
                 })
                 .then(() => {
+                    showToast(currentEventId ? '수정에 성공했습니다.' : '등록에 성공했습니다.', 'success');
                     currentEventId = null;
                     closeEventFormModal();      // 모달 닫기
                     refreshCalendarEvents();    // 캘린더 갱신
                 })
                 .catch(err => {
                     console.error(err);
-                    alert('요청에 실패했습니다.');
+                    showToast('요청에 실패했습니다.', 'error');
                 })
                 .finally(() => {
                     submitBtn.disabled = false;
@@ -745,10 +831,11 @@
                     deleteConfirmModal.hide();
                     detailEventModal.hide();
                     refreshCalendarEvents();
+                    showToast('일정 삭제 성공', 'success');
                 })
                 .catch(err => {
                     console.error(err);
-                    alert('삭제 요청에 실패했습니다.');
+                    showToast('삭제 요청에 실패했습니다.', 'error');
                 });
         });
 
