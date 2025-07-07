@@ -324,12 +324,13 @@
         const calendarEl = document.getElementById('calendar');
         const submitBtn = document.getElementById('submitBtn');
         const cancelBtn = document.getElementById('cancelBtn');
-        const editBtn     = document.getElementById('modalEditBtn');
+        const modalEditBtn     = document.getElementById('modalEditBtn');
         const titleInput  = document.getElementById('inputTitle');
         const startDateEl = document.getElementById('inputStartDate');
         const endDateEl = document.getElementById('inputEndDate');
         const detailEventModal = new bootstrap.Modal(document.getElementById('eventDetailModal'));
         const eventForm = document.getElementById('eventForm');
+        const modalDeleteBtn     = document.getElementById('modalDeleteBtn');
 
         let currentEventId = null;  // 수정 중인 이벤트 ID 보관
 
@@ -457,7 +458,7 @@
         leaveTypeEl.addEventListener('change', onLeaveTypeChange);
 
         // “수정” 버튼 클릭 핸들러
-        editBtn.addEventListener('click', (e) => {
+        modalEditBtn.addEventListener('click', (e) => {
             // 상세 모달 닫기
             detailEventModal.hide();
             const eventId = e.currentTarget.getAttribute('data-event-id');
@@ -577,6 +578,16 @@
 
                         // 수정 버튼에 eventId 속성으로 넣기
                         document.getElementById('modalEditBtn').setAttribute('data-event-id', currentEventId);
+
+                        // 2) 권한이 있을 때만 버튼 보이기 (백엔드에서 isOwner 혹은 canEdit 필드 제공)
+                        if (data.isOwner) {
+                            modalEditBtn.style.display   = '';
+                            modalDeleteBtn.style.display = '';
+                            modalEditBtn.setAttribute('data-event-id', currentEventId);
+                        } else {
+                            modalEditBtn.style.display   = 'none';
+                            modalDeleteBtn.style.display = 'none';
+                        }
 
                         // Bootstrap 모달 표시
                         detailEventModal.show();

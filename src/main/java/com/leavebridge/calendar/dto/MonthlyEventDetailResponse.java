@@ -23,10 +23,11 @@ public record MonthlyEventDetailResponse(
 	@Schema(description = "연차 종류", example = "HOLIDAY(공휴일), FULL_DAY_LEAVE(1일 연차), HALF_DAY_LEAVE(반차),  OUT_GOING(외출), SUMMER_VACATION(여름 휴가), OTHER_PERSON(비회원 연차)")
 	LeaveType leaveType,
 	@Schema(description = "일정 상세 설명", example = "일정 설명 텍스트")
-	String description
-
+	String description,
+	@Schema(description = "일정 수정, 삭제 가능한지 여부", example = "true(수정 가능), false(수정 불가)")
+	Boolean isOwner
 ) {
-	public static MonthlyEventDetailResponse from(LeaveAndHoliday leaveAndHoliday) {
+	public static MonthlyEventDetailResponse of(LeaveAndHoliday leaveAndHoliday, Boolean isOwer) {
 		return MonthlyEventDetailResponse.builder()
 			.id(leaveAndHoliday.getId())
 			.title(leaveAndHoliday.getTitle())
@@ -35,6 +36,7 @@ public record MonthlyEventDetailResponse(
 			.isAllDay(leaveAndHoliday.getIsAllDay())
 			.leaveType(leaveAndHoliday.getLeaveType())
 			.description(leaveAndHoliday.getDescription())
+			.isOwner(isOwer)
 			.build();
 	}
 }
