@@ -331,6 +331,8 @@
         const detailEventModal = new bootstrap.Modal(document.getElementById('eventDetailModal'));
         const eventForm = document.getElementById('eventForm');
         const modalDeleteBtn     = document.getElementById('modalDeleteBtn');
+        const deleteConfirmModal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+        const confirmDeleteBtn   = document.getElementById('confirmDeleteBtn');
 
         let currentEventId = null;  // 수정 중인 이벤트 ID 보관
 
@@ -670,6 +672,16 @@
             return true;
         }
 
+        // 1) 기본 헤더
+        const requestHeaders = {
+            'Content-Type': 'application/json'
+        };
+
+        // 2) CSRF 헤더가 유효하면 추가
+        if (header && token) {
+            requestHeaders[header] = token;
+        }
+
         // 폼 제출 이벤트 잡기 - form 태그 안에 button 있으면 제출
         eventForm.addEventListener('submit', function (e) {
             e.preventDefault();
@@ -694,19 +706,9 @@
             // 2) 등록 버튼 비활성화
             submitBtn.disabled = true;
 
-            // 1) 기본 헤더
-            const fetchHeaders = {
-                'Content-Type': 'application/json'
-            };
-
-            // 2) CSRF 헤더가 유효하면 추가
-            if (header && token) {
-                fetchHeaders[header] = token;
-            }
-
             fetch(url, {
                 method: method,
-                headers: fetchHeaders,
+                headers: requestHeaders,
                 body: JSON.stringify(dataObj)
             })
                 .then(res => {
@@ -724,6 +726,29 @@
                 })
                 .finally(() => {
                     submitBtn.disabled = false;
+                });
+        });
+
+        // 상세 모달의 “삭제” 버튼 클릭 → 삭제 확인 모달 띄우기
+        modalDeleteBtn.addEventListener('click', () => {
+            deleteConfirmModal.show();
+        });
+
+        // 삭제 확인 모달의 “삭제” 버튼 클릭 → API 호출, 모달 닫기, 캘린더 리프레시
+        confirmDeleteBtn.addEventListener('click', () => {
+            fetch(`/api/v1/calendar/events/${currentEventId}`, {
+                method: 'DELETE',
+                headers: requestHeaders
+            })
+                .then(res => {
+                    if (!res.ok) throw new Error('삭제 실패');
+                    deleteConfirmModal.hide();
+                    detailEventModal.hide();
+                    refreshCalendarEvents();
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert('삭제 요청에 실패했습니다.');
                 });
         });
 
