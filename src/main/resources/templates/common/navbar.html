@@ -1,0 +1,18 @@
+<nav th:fragment="navbarFragment" class="navbar navbar-expand-lg navbar-light bg-light">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="/">LeaveBridge</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav mb-2 mb-lg-0">
+        <li class="nav-item"><a class="nav-link" th:href="@{/usage}">연차사용현황</a></li>
+        <li class="nav-item"><a class="nav-link" th:href="@{/member/login}" th:if="${#authorization.expression('isAnonymous()')}">로그인</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" th:if="${#authorization.expression('isAuthenticated()')}" onclick="this.nextElementSibling.submit();">로그아웃</a>
+          <form th:action="@{/member/logout}" th:method="post" hidden></form>
+        </li>
+        <li class="nav-item"><a class="nav-link" href="/member/chaange-password" th:if="${#authorization.expression('isAuthenticated()')}">비밀번호 변경</a></li>
+      </ul>
+    </div>
+  </div>
+</nav>

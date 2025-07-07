@@ -1,24 +1,11 @@
-<!DOCTYPE html>
-<html lang='ko'>
+<html layout:decorate="~{common/layout}">
 <head>
-    <title>LeaveBridge</title>
     <style>
-        @font-face {
-            font-family: 'Pretendard-Regular';
-            src: url('https://fastly.jsdelivr.net/gh/Project-Noonnu/noonfonts_2107@1.1/Pretendard-Regular.woff') format('woff');
-            font-weight: 400;
-            font-style: normal;
-        }
-
-        html * {
-            font-family: 'Pretendard-Regular', sans-serif;
-        }
-
         /* 날짜 숫자를 가로·세로 중앙 정렬 */
         .fc .fc-daygrid-day-top {
             display: flex;
             justify-content: center; /* 가로 중앙 정렬 */
-            align-items: center;     /* 세로 중앙 정렬 */
+            align-items: center; /* 세로 중앙 정렬 */
         }
 
         /* daygrid 뷰의 날짜 셀 hover 시 배경색 변경 */
@@ -26,699 +13,684 @@
             background-color: #f0f8ff;
             cursor: pointer;
         }
-
     </style>
-    <meta charset='utf-8'/>
-    <!-- Bootstrap 5 기본 스타일 -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Bootstrap Icons -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css" rel="stylesheet">
+</head>
+<div layout:fragment="content">
+    <!-- 일정 입력/수정 모달 -->
+    <div id="eventFormModal" class="modal fade" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <form id="eventForm" class="modal-content">
+                <div class="modal-header">
+                    <h5 id="formModalTitle" class="modal-title">일정 등록</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="inputTitle" class="form-label">일정 제목</label>
+                        <input type="text" class="form-control" id="inputTitle" name="title" placeholder="박철현 연차"
+                               required>
+                    </div>
 
-    <!-- 1) 표준 FullCalendar 번들 (core + interaction + dayGrid + timeGrid + list + multimonth) -->
-    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.17/index.global.min.js"></script>
-    <!-- 2) Bootstrap5 테마 플러그인 -->
-    <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/bootstrap5@6.1.17/index.global.min.js"></script>
-    <!-- 부트스트랩 모달까지 사용하기 위함 -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+                    <!-- 종일 체크박스 -->
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="allDayCheck" name="isAllDay" value="true">
+                        <label class="form-check-label" for="allDayCheck">
+                            하루 종일 여부(All Day)
+                        </label>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="leaveType" class="form-label">휴가 유형</label>
+                        <select id="leaveType" name="leaveType" class="form-select" required>
+                            <option value="">-- 유형 선택 --</option>
+                            <option value="FULL_DAY_LEAVE">연차</option>
+                            <option value="HALF_DAY_MORNING">오전 반차</option>
+                            <option value="HALF_DAY_AFTERNOON">오후 반차</option>
+                            <option value="OUTING">외출(시간지정 연차)</option>
+                            <option value="SUMMER_VACATION">여름휴가</option>
+                            <option value="NON_DEDUCTIBLE">비차감 휴가(공가)</option>
+                            <option value="MEETING">회의</option>
+                        </select>
+                        <div class="form-text fw-bold">
+                            한 번에 하나의 연차 타입만 등록 가능합니다. 다른 타입은 별도 등록해 주세요.
+                        </div>
+                    </div>
+
+                    <!-- 날짜 입력(항상 보임) -->
+                    <div class="row mb-3">
+                        <div class="col">
+                            <label for="inputStartDate" class="form-label">시작 날짜</label>
+                            <input type="date" class="form-control" id="inputStartDate" name="startDate" required>
+                            <div class="invalid-feedback">시작 날짜는 종료 날짜보다 빠를 수 없습니다.</div>
+                        </div>
+                        <div class="col">
+                            <label for="inputEndDate" class="form-label">종료 날짜</label>
+                            <input type="date" class="form-control" id="inputEndDate" name="endDate" required>
+                        </div>
+                    </div>
+
+                    <!-- 시간 입력(체크박스에 따라 토글) -->
+                    <div class="row mb-3" id="timeGroup" style="display: none;">
+                        <div class="col">
+                            <label for="inputStartTime" class="form-label">시작 시간</label>
+                            <input type="time" class="form-control" id="inputStartTime" name="startTime">
+                            <div class="invalid-feedback">시작 시간은 종료 시간보다 빠를 수 없습니다.</div>
+                        </div>
+                        <div class="col">
+                            <label for="inputEndTime" class="form-label">종료 시간</label>
+                            <input type="time" class="form-control" id="inputEndTime" name="endTime">
+                        </div>
+                    </div>
+                    <!-- 비고 -->
+                    <div class="mb-3">
+                        <label for="inputDescription" class="form-label">비고</label>
+                        <textarea class="form-control" id="inputDescription" name="description" rows="3"
+                                  placeholder="공가 사유 등 입력(꼭 필요한 경우만 - 개인 연차 사용 미입력)"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <!-- <button> 요소에 type 속성을 명시하지 않으면 HTML5 기준에서 type="submit"이 디폴트 적용 -->
+                    <button type="submit" class="btn btn-primary" id="submitBtn">일정 등록</button>
+                    <button type="button" class="btn btn-secondary" id="cancelBtn" data-bs-dismiss="modal">등록 취소
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 이벤트 상세 모달 -->
+    <div id="eventDetailModal" class="modal fade" tabindex="-1" aria-labelledby="eventDetailLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 id="modalTitle" class="modal-title">
+                        <i class="bi bi-calendar-event me-2"></i>
+                        이벤트 제목
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                            aria-label="닫기"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-12">
+                            <dl class="row">
+                                <dt class="col-sm-3">
+                                    <i class="bi bi-clock me-1"></i>시작 시간
+                                </dt>
+                                <dd id="modalStart" class="col-sm-9">2025-07-10T10:00:00</dd>
+
+                                <dt class="col-sm-3">
+                                    <i class="bi bi-clock-history me-1"></i>종료 시간
+                                </dt>
+                                <dd id="modalEnd" class="col-sm-9">2025-07-10T12:00:00</dd>
+
+                                <dt class="col-sm-3">
+                                    <i class="bi bi-card-text me-1"></i>설명
+                                </dt>
+                                <dd id="modalDescription" class="col-sm-9">세부 일정 및 준비물</dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer d-flex justify-content-between">
+                    <div class="btn-group-custom d-flex">
+                        <button id="modalEditBtn" type="button" class="btn btn-outline-primary">
+                            <i class="bi bi-pencil me-1"></i>수정
+                        </button>
+                        <button id="modalDeleteBtn" type="button" class="btn btn-outline-danger">
+                            <i class="bi bi-trash me-1"></i>삭제
+                        </button>
+                    </div>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-1"></i>닫기
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 삭제 확인 모달 -->
+    <div id="deleteConfirmModal" class="modal fade" tabindex="-1" aria-labelledby="deleteConfirmLabel"
+         aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="deleteConfirmLabel">
+                        <i class="bi bi-exclamation-triangle me-2"></i>삭제 확인
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                            aria-label="닫기"></button>
+                </div>
+                <div class="modal-body">
+                    <p>정말로 이 일정을 삭제하시겠습니까?</p>
+                    <p class="text-muted">삭제된 일정은 복구할 수 없습니다.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+                    <button id="confirmDeleteBtn" type="button" class="btn btn-danger">삭제</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id='calendar'></div>
 
     <script>
-        // 현재 페이지의 호스트를 뽑아서 livereload.js를 로드
-        (function () {
-            var host = window.location.hostname || 'localhost';
-            var script = document.createElement('script');
-            script.src = 'http://' + host + ':35729/livereload.js?snipver=1';
-            document.head.appendChild(script);
-        })();
-    </script>
 
-</head>
+        // Vanilla JS로 CSRF 메타 태그를 꺼내되, 없으면 빈 문자열('')
+        const header = document
+                .querySelector("meta[name='_csrf_header']")
+                ?.getAttribute("content")
+            ?? "";
 
-<body>
+        const token = document
+                .querySelector("meta[name='_csrf']")
+                ?.getAttribute("content")
+            ?? "";
 
-<!-- 일정 입력/수정 모달 -->
-<div id="eventFormModal" class="modal fade" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <form id="eventForm" class="modal-content">
-            <div class="modal-header">
-                <h5 id="formModalTitle" class="modal-title">일정 등록</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label for="inputTitle" class="form-label">일정 제목</label>
-                    <input type="text" class="form-control" id="inputTitle" name="title" placeholder="박철현 연차" required>
-                </div>
+        /**
+         * 오늘 날짜를 'YYYY-MM-DD' 형식의 문자열로 반환합니다.
+         * @returns {string} 포맷된 날짜 문자열
+         */
+        function getFormattedDate() {
+            const today = new Date();   // 현재 날짜/시간을 담은 Date 객체 생성
+            const year = today.getFullYear();  // 4자리 연도 추출 (예: 2025)
+            const month = String(today.getMonth() + 1) // 월은 0~11로 반환하므로 +1 필요
+                .padStart(2, '0');                     // 한 자리일 때 앞에 '0' 추가
+            const day = String(today.getDate())    // 1~31 사이 일자 반환
+                .padStart(2, '0');                     // 한 자리일 때 앞에 '0' 추가
 
-                <!-- 종일 체크박스 -->
-                <div class="form-check mb-3">
-                    <input class="form-check-input" type="checkbox" id="allDayCheck" name="isAllDay" value="true">
-                    <label class="form-check-label" for="allDayCheck">
-                        하루 종일 여부(All Day)
-                    </label>
-                </div>
-
-                <div class="mb-3">
-                    <label for="leaveType" class="form-label">휴가 유형</label>
-                    <select id="leaveType" name="leaveType" class="form-select" required>
-                        <option value="">-- 유형 선택 --</option>
-                        <option value="FULL_DAY_LEAVE">연차</option>
-                        <option value="HALF_DAY_MORNING">오전 반차</option>
-                        <option value="HALF_DAY_AFTERNOON">오후 반차</option>
-                        <option value="OUTING">외출(시간지정 연차)</option>
-                        <option value="SUMMER_VACATION">여름휴가</option>
-                        <option value="NON_DEDUCTIBLE">비차감 휴가(공가)</option>
-                        <option value="MEETING">회의</option>
-                    </select>
-                    <div class="form-text fw-bold">
-                        한 번에 하나의 연차 타입만 등록 가능합니다. 다른 타입은 별도 등록해 주세요.
-                    </div>
-                </div>
-
-                <!-- 날짜 입력(항상 보임) -->
-                <div class="row mb-3">
-                    <div class="col">
-                        <label for="inputStartDate" class="form-label">시작 날짜</label>
-                        <input type="date" class="form-control" id="inputStartDate" name="startDate" required>
-                        <div class="invalid-feedback">시작 날짜는 종료 날짜보다 빠를 수 없습니다.</div>
-                    </div>
-                    <div class="col">
-                        <label for="inputEndDate" class="form-label">종료 날짜</label>
-                        <input type="date" class="form-control" id="inputEndDate" name="endDate" required>
-                    </div>
-                </div>
-
-                <!-- 시간 입력(체크박스에 따라 토글) -->
-                <div class="row mb-3" id="timeGroup" style="display: none;">
-                    <div class="col">
-                        <label for="inputStartTime" class="form-label">시작 시간</label>
-                        <input type="time" class="form-control" id="inputStartTime" name="startTime">
-                        <div class="invalid-feedback">시작 시간은 종료 시간보다 빠를 수 없습니다.</div>
-                    </div>
-                    <div class="col">
-                        <label for="inputEndTime" class="form-label">종료 시간</label>
-                        <input type="time" class="form-control" id="inputEndTime" name="endTime">
-                    </div>
-                </div>
-                <!-- 비고 -->
-                <div class="mb-3">
-                    <label for="inputDescription" class="form-label">비고</label>
-                    <textarea class="form-control" id="inputDescription" name="description" rows="3"
-                              placeholder="공가 사유 등 입력(꼭 필요한 경우만 - 개인 연차 사용 미입력)"></textarea>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <!-- <button> 요소에 type 속성을 명시하지 않으면 HTML5 기준에서 type="submit"이 디폴트 적용 -->
-                <button type="submit" class="btn btn-primary" id="submitBtn">일정 등록</button>
-                <button type="button" class="btn btn-secondary" id="cancelBtn" data-bs-dismiss="modal">등록 취소</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- 이벤트 상세 모달 -->
-<div id="eventDetailModal" class="modal fade" tabindex="-1" aria-labelledby="eventDetailLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 id="modalTitle" class="modal-title">
-                    <i class="bi bi-calendar-event me-2"></i>
-                    이벤트 제목
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
-                        aria-label="닫기"></button>
-            </div>
-            <div class="modal-body">
-                <div class="row">
-                    <div class="col-12">
-                        <dl class="row">
-                            <dt class="col-sm-3">
-                                <i class="bi bi-clock me-1"></i>시작 시간
-                            </dt>
-                            <dd id="modalStart" class="col-sm-9">2025-07-10T10:00:00</dd>
-
-                            <dt class="col-sm-3">
-                                <i class="bi bi-clock-history me-1"></i>종료 시간
-                            </dt>
-                            <dd id="modalEnd" class="col-sm-9">2025-07-10T12:00:00</dd>
-
-                            <dt class="col-sm-3">
-                                <i class="bi bi-card-text me-1"></i>설명
-                            </dt>
-                            <dd id="modalDescription" class="col-sm-9">세부 일정 및 준비물</dd>
-                        </dl>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer d-flex justify-content-between">
-                <div class="btn-group-custom d-flex">
-                    <button id="modalEditBtn" type="button" class="btn btn-outline-primary">
-                        <i class="bi bi-pencil me-1"></i>수정
-                    </button>
-                    <button id="modalDeleteBtn" type="button" class="btn btn-outline-danger">
-                        <i class="bi bi-trash me-1"></i>삭제
-                    </button>
-                </div>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                    <i class="bi bi-x-circle me-1"></i>닫기
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- 삭제 확인 모달 -->
-<div id="deleteConfirmModal" class="modal fade" tabindex="-1" aria-labelledby="deleteConfirmLabel"
-     aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title" id="deleteConfirmLabel">
-                    <i class="bi bi-exclamation-triangle me-2"></i>삭제 확인
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
-                        aria-label="닫기"></button>
-            </div>
-            <div class="modal-body">
-                <p>정말로 이 일정을 삭제하시겠습니까?</p>
-                <p class="text-muted">삭제된 일정은 복구할 수 없습니다.</p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
-                <button id="confirmDeleteBtn" type="button" class="btn btn-danger">삭제</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-
-<!-- 1) 상단 네비게이션 바 -->
-<nav class="navbar navbar-expand-lg navbar-light bg-light">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="/">LeaveBridge</a> <!-- 홈으로 -->
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
-                data-bs-target="#navbarSupportedContent">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navbarSupportedContent">
-            <ul class="navbar-nav mb-2 mb-lg-0">
-                <!-- 연차사용현황 버튼 -->
-                <li class="nav-item">
-                    <a class="nav-link" th:href="@{/usage}">연차사용현황</a>
-                </li>
-                <!-- 로그인 or 로그아웃 -->
-                <li>
-                    <a class="nav-link font-bold" sec:authorize="isAnonymous()" th:href="@{/user/login}">로그인</a>
-                    <a sec:authorize="isAuthenticated()" class="nav-link" href="javascript:;"
-                       onclick="this.nextElementSibling.submit();">로그아웃</a>
-                    <form sec:authorize="isAuthenticated()" method="POST" hidden th:action="@{/user/logout}"></form>
-                </li>
-            </ul>
-        </div>
-    </div>
-</nav>
-
-<div id='calendar'></div>
-
-<script>
-
-    // Vanilla JS로 CSRF 메타 태그를 꺼내되, 없으면 빈 문자열('')
-    const header = document
-            .querySelector("meta[name='_csrf_header']")
-            ?.getAttribute("content")
-        ?? "";
-
-    const token = document
-            .querySelector("meta[name='_csrf']")
-            ?.getAttribute("content")
-        ?? "";
-
-    /**
-     * 오늘 날짜를 'YYYY-MM-DD' 형식의 문자열로 반환합니다.
-     * @returns {string} 포맷된 날짜 문자열
-     */
-    function getFormattedDate() {
-        const today = new Date();   // 현재 날짜/시간을 담은 Date 객체 생성
-        const year = today.getFullYear();  // 4자리 연도 추출 (예: 2025)
-        const month = String(today.getMonth() + 1) // 월은 0~11로 반환하므로 +1 필요
-            .padStart(2, '0');                     // 한 자리일 때 앞에 '0' 추가
-        const day = String(today.getDate())    // 1~31 사이 일자 반환
-            .padStart(2, '0');                     // 한 자리일 때 앞에 '0' 추가
-
-        return `${year}-${month}-${day}`;  // 템플릿 리터럴로 최종 문자열 조합
-    }
-
-    /*
-        좀 더 친숙한 시간 표현대로 변경하는 함수
-     */
-    function formatKoreanDateTime(isoString) {
-        const date = new Date(isoString);
-        const formatter = new Intl.DateTimeFormat('ko-KR', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: 'numeric',
-            minute: 'numeric',
-            hour12: true
-        });
-        // 예: "2025년 7월 10일 오후 2:00"
-        return formatter.format(date);
-    }
-
-    function onModifyToggleAllDayChange() {
-        const allDayCheck = document.getElementById('allDayCheck');
-        const timeGroup = document.getElementById('timeGroup');
-        const startTime = document.getElementById('inputStartTime');
-        const endTime = document.getElementById('inputEndTime');
-        if (allDayCheck.checked) {
-            // 종일: 시간 입력 숨기기
-            timeGroup.style.display = 'none';
-            startTime.required = false;
-            endTime.required = false;
-
-            // 범위·값 모두 제거
-            startTime.value = '';
-            endTime.value   = '';
-            startTime.removeAttribute('min');
-            startTime.removeAttribute('max');
-            endTime.removeAttribute('min');
-            endTime.removeAttribute('max');
-        } else {
-            // 시간 지정: 시간 입력 보이기
-            timeGroup.style.display = '';
-            startTime.required = true;
-            endTime.required = true;
+            return `${year}-${month}-${day}`;  // 템플릿 리터럴로 최종 문자열 조합
         }
-    }
 
-    const allDayCheck = document.getElementById('allDayCheck');
-    allDayCheck.addEventListener('change', onModifyToggleAllDayChange);
+        /*
+            좀 더 친숙한 시간 표현대로 변경하는 함수
+         */
+        function formatKoreanDateTime(isoString) {
+            const date = new Date(isoString);
+            const formatter = new Intl.DateTimeFormat('ko-KR', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: 'numeric',
+                hour12: true
+            });
+            // 예: "2025년 7월 10일 오후 2:00"
+            return formatter.format(date);
+        }
 
-    document.addEventListener('DOMContentLoaded', () => {
-        // 1) 요소 조회
-        const leaveTypeEl = document.getElementById('leaveType');
-        const timeGroup = document.getElementById('timeGroup');
-        const startTimeEl = document.getElementById('inputStartTime');
-        const endTimeEl = document.getElementById('inputEndTime');
-        const descriptionEl = document.getElementById('inputDescription');
-        const formModal = new bootstrap.Modal(document.getElementById('eventFormModal'));
-        const calendarEl = document.getElementById('calendar');
-        const submitBtn = document.getElementById('submitBtn');
-        const cancelBtn = document.getElementById('cancelBtn');
-        const editBtn     = document.getElementById('modalEditBtn');
-        const titleInput  = document.getElementById('inputTitle');
-        const startDateEl = document.getElementById('inputStartDate');
-        const endDateEl = document.getElementById('inputEndDate');
-        const detailEventModal = new bootstrap.Modal(document.getElementById('eventDetailModal'));
-        const eventForm = document.getElementById('eventForm');
+        function onModifyToggleAllDayChange() {
+            const allDayCheck = document.getElementById('allDayCheck');
+            const timeGroup = document.getElementById('timeGroup');
+            const startTime = document.getElementById('inputStartTime');
+            const endTime = document.getElementById('inputEndTime');
+            if (allDayCheck.checked) {
+                // 종일: 시간 입력 숨기기
+                timeGroup.style.display = 'none';
+                startTime.required = false;
+                endTime.required = false;
 
-        let currentEventId = null;  // 수정 중인 이벤트 ID 보관
+                // 범위·값 모두 제거
+                startTime.value = '';
+                endTime.value = '';
+                startTime.removeAttribute('min');
+                startTime.removeAttribute('max');
+                endTime.removeAttribute('min');
+                endTime.removeAttribute('max');
+            } else {
+                // 시간 지정: 시간 입력 보이기
+                timeGroup.style.display = '';
+                startTime.required = true;
+                endTime.required = true;
+            }
+        }
 
+        const allDayCheck = document.getElementById('allDayCheck');
         allDayCheck.addEventListener('change', onModifyToggleAllDayChange);
 
-        function resetValidation() {
-            // invalid 클래스를 모두 제거
-            eventForm.querySelectorAll('.is-invalid').forEach(el => {
-                el.classList.remove('is-invalid');
-            });
+        document.addEventListener('DOMContentLoaded', () => {
+            // 1) 요소 조회
+            const leaveTypeEl = document.getElementById('leaveType');
+            const timeGroup = document.getElementById('timeGroup');
+            const startTimeEl = document.getElementById('inputStartTime');
+            const endTimeEl = document.getElementById('inputEndTime');
+            const descriptionEl = document.getElementById('inputDescription');
+            const formModal = new bootstrap.Modal(document.getElementById('eventFormModal'));
+            const calendarEl = document.getElementById('calendar');
+            const submitBtn = document.getElementById('submitBtn');
+            const cancelBtn = document.getElementById('cancelBtn');
+            const modalEditBtn = document.getElementById('modalEditBtn');
+            const titleInput = document.getElementById('inputTitle');
+            const startDateEl = document.getElementById('inputStartDate');
+            const endDateEl = document.getElementById('inputEndDate');
+            const detailEventModal = new bootstrap.Modal(document.getElementById('eventDetailModal'));
+            const eventForm = document.getElementById('eventForm');
+            const modalDeleteBtn = document.getElementById('modalDeleteBtn');
+            const deleteConfirmModal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+            const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
 
-            // 각 필드의 customValidity 도 초기화
-            [startDateEl, endDateEl, startTimeEl, endTimeEl].forEach(el => {
-                el.setCustomValidity('');
-            });
-        }
+            let currentEventId = null;  // 수정 중인 이벤트 ID 보관
 
-        // 모달 DOM 요소
-        const eventFormModalEl = document.getElementById('eventFormModal');
-        // 폼 모달 닫기 버튼 눌렀을때도 validation 초기화
-        eventFormModalEl.addEventListener('hidden.bs.modal', resetValidation);
+            allDayCheck.addEventListener('change', onModifyToggleAllDayChange);
 
-        let anchorDate = null;         // 폼이 열릴 때 클릭한 날짜 기억
+            function resetValidation() {
+                // invalid 클래스를 모두 제거
+                eventForm.querySelectorAll('.is-invalid').forEach(el => {
+                    el.classList.remove('is-invalid');
+                });
 
-        // 3) leaveType 변경 시 UI 조정
-        function onLeaveTypeChange() {
-            const currentType = leaveTypeEl.value;
-
-            // 0) 기본 리셋 (페어된 로직만 남김)
-            allDayCheck.disabled = false;
-            startTimeEl.required = false;
-            endTimeEl.required   = false;
-            allDayCheck.checked  = true;
-            timeGroup.style.display = 'none';
-            startDateEl.readOnly = false;
-            endDateEl.readOnly   = false;
-            startTimeEl.readOnly = false;
-            endTimeEl.readOnly   = false;
-            descriptionEl.required = false;
-            startTimeEl.removeAttribute('min');
-            startTimeEl.removeAttribute('max');
-            endTimeEl.removeAttribute('min');
-            endTimeEl.removeAttribute('max');
-
-            // ✅ 반차·외출 3종은 “클릭한 날” 하루로 고정
-            const isHalfOrOuting = ['HALF_DAY_MORNING', 'HALF_DAY_AFTERNOON', 'OUTING']
-                .includes(currentType);
-
-            if (isHalfOrOuting && anchorDate) {     // dateClick 으로 열린 경우에만
-                startDateEl.value  = anchorDate;
-                endDateEl.value    = anchorDate;
-                startDateEl.readOnly = true;
-                endDateEl.readOnly   = true;
+                // 각 필드의 customValidity 도 초기화
+                [startDateEl, endDateEl, startTimeEl, endTimeEl].forEach(el => {
+                    el.setCustomValidity('');
+                });
             }
 
+            // 모달 DOM 요소
+            const eventFormModalEl = document.getElementById('eventFormModal');
+            // 폼 모달 닫기 버튼 눌렀을때도 validation 초기화
+            eventFormModalEl.addEventListener('hidden.bs.modal', resetValidation);
 
-            // 1) 타입별 고유 설정
-            switch (currentType) {
-                case '':
-                    allDayCheck.checked = true;
-                    startTimeEl.required = false;
-                    endTimeEl.required   = false;
-                    return;
+            let anchorDate = null;         // 폼이 열릴 때 클릭한 날짜 기억
 
-                case 'FULL_DAY_LEAVE':
-                case 'SUMMER_VACATION':
-                    allDayCheck.checked = true;
-                    allDayCheck.disabled = true;
-                    startTimeEl.value = '00:00';
-                    endTimeEl.value   = '23:59';
-                    startDateEl.readOnly = false;
-                    endDateEl.readOnly   = false;
-                    break;
+            // 3) leaveType 변경 시 UI 조정
+            function onLeaveTypeChange() {
+                const currentType = leaveTypeEl.value;
 
-                case 'HALF_DAY_MORNING':
-                    allDayCheck.checked = false;
-                    allDayCheck.disabled = true;
-                    timeGroup.style.display = '';
-                    startTimeEl.value = '08:00';
-                    endTimeEl.value   = '13:00';
+                // 0) 기본 리셋 (페어된 로직만 남김)
+                allDayCheck.disabled = false;
+                startTimeEl.required = false;
+                endTimeEl.required = false;
+                allDayCheck.checked = true;
+                timeGroup.style.display = 'none';
+                startDateEl.readOnly = false;
+                endDateEl.readOnly = false;
+                startTimeEl.readOnly = false;
+                endTimeEl.readOnly = false;
+                descriptionEl.required = false;
+                startTimeEl.removeAttribute('min');
+                startTimeEl.removeAttribute('max');
+                endTimeEl.removeAttribute('min');
+                endTimeEl.removeAttribute('max');
+
+                // ✅ 반차·외출 3종은 “클릭한 날” 하루로 고정
+                const isHalfOrOuting = ['HALF_DAY_MORNING', 'HALF_DAY_AFTERNOON', 'OUTING']
+                    .includes(currentType);
+
+                if (isHalfOrOuting && anchorDate) {     // dateClick 으로 열린 경우에만
+                    startDateEl.value = anchorDate;
+                    endDateEl.value = anchorDate;
                     startDateEl.readOnly = true;
-                    endDateEl.readOnly   = true;
-                    startTimeEl.readOnly = true;
-                    endTimeEl.readOnly   = true;
-                    return;  // 범위 세팅도 필요 없으니 리턴
-
-                case 'HALF_DAY_AFTERNOON':
-                    allDayCheck.checked = false;
-                    allDayCheck.disabled = true;
-                    timeGroup.style.display = '';
-                    startTimeEl.value = '13:00';
-                    endTimeEl.value   = '17:00';
-                    startDateEl.readOnly = true;
-                    endDateEl.readOnly   = true;
-                    startTimeEl.readOnly = true;
-                    endTimeEl.readOnly   = true;
-                    return;
-
-                case 'OUTING':
-                    allDayCheck.checked = false;
-                    allDayCheck.disabled = true;
-                    timeGroup.style.display = '';
-                    startDateEl.readOnly = true;
-                    endDateEl.readOnly   = true;
-                    startTimeEl.min = '08:00';
-                    startTimeEl.max = '17:00';
-                    endTimeEl.min   = '08:00';
-                    endTimeEl.max   = '17:00';
-                    break;
-
-                case 'NON_DEDUCTIBLE':
-                    // 범위만 공통 적용, 나머지 기본 동작 유지
-                    descriptionEl.required = true
-                    break;
-
-                case 'MEETING':
-                    break;
-
-                default:
-                    break;
-            }
-
-        }
-
-        leaveTypeEl.addEventListener('change', onLeaveTypeChange);
-
-        // “수정” 버튼 클릭 핸들러
-        editBtn.addEventListener('click', (e) => {
-            // 상세 모달 닫기
-            detailEventModal.hide();
-            const eventId = e.currentTarget.getAttribute('data-event-id');
-
-            // 기존 입력 모달 초기화
-            document.getElementById('eventForm').reset();
-            resetValidation();
-            submitBtn.disabled = false;
-
-            // 모드 전환
-            document.getElementById('formModalTitle').textContent = '일정 수정';
-            submitBtn.textContent = '수정하기';
-            cancelBtn.textContent = '수정취소'
-
-
-            fetch(`/api/v1/calendar/events/${eventId}`)
-                .then(res => res.json())
-                .then(evt => {
-                    // 2) 폼 필드에 값 채우기
-                    titleInput.value       = evt.title;
-                    leaveTypeEl.value      = evt.leaveType;
-                    startDateEl.value      = evt.startDate.slice(0,10);
-                    endDateEl.value        = evt.endDate.slice(0,10);
-                    if (!evt.isAllDay) {
-                        allDayCheck.checked     = false;
-                        startTimeEl.value     = evt.startDate.slice(11,16);
-                        endTimeEl.value       = evt.endDate.slice(11,16);
-                    } else {
-                        allDayCheck.checked     = true;
-                    }
-                    descriptionEl.value           = evt.description || '';
-
-                    // 3) onLeaveTypeChange 등 UI 토글 함수 호출
-                    onLeaveTypeChange();
-
-                    formModal.show();
-                })
-                .catch(console.error);
-        });
-
-        // 4) FullCalendar 초기화
-        let calendar = new FullCalendar.Calendar(calendarEl, {
-            themeSystem: 'bootstrap5',
-            // 여러 속성들
-            initialView: 'dayGridMonth',  // 초기 보기 설정, 기본값 dayGridMonth
-            initialDate: getFormattedDate(),  // 캘린더 로드 시 초기 날짜 설절, 기본값 오늘 날짜
-            // displayEventEnd: true,    // 종료 시간도 함께 표시
-            locale: 'ko',  // 언머 및 지역화 설정 변경
-            timeZone: 'Asia/Seoul', // IANA 시간대 설정(명명된 시간대)
-            weekends: true,  // 주말 포함 여부 기본값 true
-            height: '100%',   // 100%의 경우 부모 컨테이너 요소 높이와 일치
-            contentHeight: 'auto',  // 본문 영역 높이 auto시 뷰 높이 자연스럽고 스크롤바 사용 안함
-            aspectRatio: 1.5, // 너비: 높이 비율 1.5:1 (종횡비)
-            eventColor: '#3799d8',  // 기본 일정 배경색 설정 (파란색)
-            eventTextColor: '#ffffff',  // 글자 색상 변경
-            dayMaxEvents: true,  // 하루 최대 이벤트 표시(true 인경우 적절히)
-            // moreLinkClick: function (info) {
-            //     alert('더보기 클릭: ' + info.data);
-            //     // 여기서 팝업을 열거나 다른 행동 정의할 수 있음
-            //     return false; // 기본 팝업 열림 방지(false: 팝업 열림, true: 팝업 안열림)
-            // },
-            selectable: true,   // 사용자가 선택하고 취소되는 시점 모니터링
-            headerToolbar: {
-                left: 'prev next',
-                center: 'title',
-                right: 'dayGridMonth timeGridWeek timeGridDay'
-            },
-            views: {
-                dayGridMonth: {
-                    titleFormat: {
-                        year: 'numeric',
-                        month: '2-digit'
-                    }
+                    endDateEl.readOnly = true;
                 }
-            },
-            buttonText: {
-                today: '현재날짜',
-                month: '월',
-                week: '주',
-                day: '일'
-            },
 
-            // 서버에서 일정 JSON 데이터 로드
-            events: (info) => {
-                // info.start : 화면에 표시된 달력 첫날
-                // 달력의 첫날은 매월 1일이 보장 안되기에(이전달의 30일 일수도) 10일정도 더해서 월 맞추기 위함
-                const tenDaysMs = 10 * 24 * 60 * 60 * 1000;  // 10일
-                const midDate = new Date(info.start.getTime() + tenDaysMs);
 
-                const y = midDate.getFullYear();      // 예: 2025
-                const m = midDate.getMonth() + 1;     // 1~12
+                // 1) 타입별 고유 설정
+                switch (currentType) {
+                    case '':
+                        allDayCheck.checked = true;
+                        startTimeEl.required = false;
+                        endTimeEl.required = false;
+                        return;
 
-                // GET 요청 → Promise 반환
-                return fetch(`/api/v1/calendar/events/${y}/${m}`)
-                    .then(res => {
-                        if (!res.ok) throw new Error('네트워크 에러');
-                        return res.json();                // JSON 배열을 반환하는 Promise
-                    });
-            },
+                    case 'FULL_DAY_LEAVE':
+                    case 'SUMMER_VACATION':
+                        allDayCheck.checked = true;
+                        allDayCheck.disabled = true;
+                        startTimeEl.value = '00:00';
+                        endTimeEl.value = '23:59';
+                        startDateEl.readOnly = false;
+                        endDateEl.readOnly = false;
+                        break;
 
-            // event 클릭 함수 정의 -> 일정 정보 (수정, 삭제 가능하도록)
-            eventClick: function (info) {
-                currentEventId = info.event.id;
+                    case 'HALF_DAY_MORNING':
+                        allDayCheck.checked = false;
+                        allDayCheck.disabled = true;
+                        timeGroup.style.display = '';
+                        startTimeEl.value = '08:00';
+                        endTimeEl.value = '13:00';
+                        startDateEl.readOnly = true;
+                        endDateEl.readOnly = true;
+                        startTimeEl.readOnly = true;
+                        endTimeEl.readOnly = true;
+                        return;  // 범위 세팅도 필요 없으니 리턴
 
-                // 서버에서 상세 정보 불러오기
-                fetch(`/api/v1/calendar/events/${currentEventId}`)
-                    .then(response => {
-                        if (!response.ok) throw new Error('네트워크 응답 실패');
-                        return response.json();
-                    })
-                    .then(data => {
-                        // 모달 내부 요소에 데이터 채우기
-                        document.getElementById('modalTitle').textContent = data.title;
-                        document.getElementById('modalStart').textContent = formatKoreanDateTime(data.startDate);
-                        document.getElementById('modalEnd').textContent = formatKoreanDateTime(data.endDate);
-                        document.getElementById('modalDescription').textContent = data.description || '설명 없음';
+                    case 'HALF_DAY_AFTERNOON':
+                        allDayCheck.checked = false;
+                        allDayCheck.disabled = true;
+                        timeGroup.style.display = '';
+                        startTimeEl.value = '13:00';
+                        endTimeEl.value = '17:00';
+                        startDateEl.readOnly = true;
+                        endDateEl.readOnly = true;
+                        startTimeEl.readOnly = true;
+                        endTimeEl.readOnly = true;
+                        return;
 
-                        // 수정 버튼에 eventId 속성으로 넣기
-                        document.getElementById('modalEditBtn').setAttribute('data-event-id', currentEventId);
+                    case 'OUTING':
+                        allDayCheck.checked = false;
+                        allDayCheck.disabled = true;
+                        timeGroup.style.display = '';
+                        startDateEl.readOnly = true;
+                        endDateEl.readOnly = true;
+                        startTimeEl.min = '08:00';
+                        startTimeEl.max = '17:00';
+                        endTimeEl.min = '08:00';
+                        endTimeEl.max = '17:00';
+                        break;
 
-                        // Bootstrap 모달 표시
-                        detailEventModal.show();
-                    })
-                    .catch(err => {
-                        console.error('이벤트 상세 조회 중 오류:', err);
-                        alert('이벤트 정보를 불러오는 데 실패했습니다.');
-                    });
-            },
+                    case 'NON_DEDUCTIBLE':
+                        // 범위만 공통 적용, 나머지 기본 동작 유지
+                        descriptionEl.required = true
+                        break;
 
-            // 날짜나 시간 클릭 시 발생 -> 일정 생성 폼 등록
-            dateClick: function (info) {
-                // 등록 모드 진입 시 기존 ID 초기화
-                currentEventId = null;
-                // 전역 변수에 클릭한 날짜 저장
-                anchorDate = info.dateStr;
-                // 1) 모달 제목 설정 (등록 모드)
-                document.getElementById('formModalTitle').textContent = '일정 등록';
-                submitBtn.textContent = '등록하기';
-                cancelBtn.textContent = '등록취소';
-                // 2) 폼 리셋 & 일정 등록 버튼 활성화
+                    case 'MEETING':
+                        break;
+
+                    default:
+                        break;
+                }
+
+            }
+
+            leaveTypeEl.addEventListener('change', onLeaveTypeChange);
+
+            // “수정” 버튼 클릭 핸들러
+            modalEditBtn.addEventListener('click', (e) => {
+                // 상세 모달 닫기
+                detailEventModal.hide();
+                const eventId = e.currentTarget.getAttribute('data-event-id');
+
+                // 기존 입력 모달 초기화
                 document.getElementById('eventForm').reset();
                 resetValidation();
-                submitBtn.disabled = false
-                // 3) “종일” 체크 & 토글
-                const allDayCheck = document.getElementById('allDayCheck');
-                allDayCheck.checked = true;        // 종일 모드로 강제 전환
+                submitBtn.disabled = false;
 
-                // 4) 날짜 입력값을 클릭한 날짜로 초기화
-                document.getElementById('inputStartDate').value = info.dateStr;
-                document.getElementById('inputEndDate').value = info.dateStr;
-
-                // 5) 모달 띄우기
-                formModal.show();
-            }
-
-        });
-        calendar.render();
-        window.calendar = calendar;
-
-        // 5) 페이지 로드 직후에도 선택값 반영
-        onLeaveTypeChange();
+                // 모드 전환
+                document.getElementById('formModalTitle').textContent = '일정 수정';
+                submitBtn.textContent = '수정하기';
+                cancelBtn.textContent = '수정취소'
 
 
-        // 1) Bootstrap 5 모달 닫기
-        function closeEventFormModal() {
-            formModal.hide();
-        }
+                fetch(`/api/v1/calendar/events/${eventId}`)
+                    .then(res => res.json())
+                    .then(evt => {
+                        // 2) 폼 필드에 값 채우기
+                        titleInput.value = evt.title;
+                        leaveTypeEl.value = evt.leaveType;
+                        startDateEl.value = evt.startDate.slice(0, 10);
+                        endDateEl.value = evt.endDate.slice(0, 10);
+                        if (!evt.isAllDay) {
+                            allDayCheck.checked = false;
+                            startTimeEl.value = evt.startDate.slice(11, 16);
+                            endTimeEl.value = evt.endDate.slice(11, 16);
+                        } else {
+                            allDayCheck.checked = true;
+                        }
+                        descriptionEl.value = evt.description || '';
 
-        // 2) FullCalendar 이벤트 다시 불러오기
-        function refreshCalendarEvents() {
-            calendar.refetchEvents();
-        }
+                        // 3) onLeaveTypeChange 등 UI 토글 함수 호출
+                        onLeaveTypeChange();
 
-        // ➊ 검증 함수
-        function validateDateTime() {
-            const sd = startDateEl.value;        // "2025-07-30"
-            const ed = endDateEl.value;          // ""
-            const st = startTimeEl.value;        // "13:00"
-            const et = endTimeEl.value;
-
-            // 1) 날짜 비교
-            if (sd && ed && sd > ed) {           // YYYY-MM-DD는 문자열 비교 OK
-                startDateEl.setCustomValidity('invalid-date');
-                startDateEl.classList.add('is-invalid');
-                return false;
-            }
-            // 2) 시간 비교 (allDay 아니어야 함)
-            if (!allDayCheck.checked && st && et && st >= et) {
-                startTimeEl.setCustomValidity('invalid-time');
-                startTimeEl.classList.add('is-invalid');
-                return false;
-            }
-
-            /* 모두 통과 → 기존 오류 리셋 */
-            [startDateEl, startTimeEl].forEach(el => {
-                el.setCustomValidity('');
-                el.classList.remove('is-invalid');
+                        formModal.show();
+                    })
+                    .catch(console.error);
             });
-            return true;
-        }
 
-        // 폼 제출 이벤트 잡기 - form 태그 안에 button 있으면 제출
-        eventForm.addEventListener('submit', function (e) {
-            e.preventDefault();
+            // 4) FullCalendar 초기화
+            let calendar = new FullCalendar.Calendar(calendarEl, {
+                themeSystem: 'bootstrap5',
+                // 여러 속성들
+                initialView: 'dayGridMonth',  // 초기 보기 설정, 기본값 dayGridMonth
+                initialDate: getFormattedDate(),  // 캘린더 로드 시 초기 날짜 설절, 기본값 오늘 날짜
+                // displayEventEnd: true,    // 종료 시간도 함께 표시
+                locale: 'ko',  // 언머 및 지역화 설정 변경
+                timeZone: 'Asia/Seoul', // IANA 시간대 설정(명명된 시간대)
+                weekends: true,  // 주말 포함 여부 기본값 true
+                height: '100%',   // 100%의 경우 부모 컨테이너 요소 높이와 일치
+                contentHeight: 'auto',  // 본문 영역 높이 auto시 뷰 높이 자연스럽고 스크롤바 사용 안함
+                aspectRatio: 1.5, // 너비: 높이 비율 1.5:1 (종횡비)
+                eventColor: '#3799d8',  // 기본 일정 배경색 설정 (파란색)
+                eventTextColor: '#ffffff',  // 글자 색상 변경
+                dayMaxEvents: true,  // 하루 최대 이벤트 표시(true 인경우 적절히)
+                // moreLinkClick: function (info) {
+                //     alert('더보기 클릭: ' + info.data);
+                //     // 여기서 팝업을 열거나 다른 행동 정의할 수 있음
+                //     return false; // 기본 팝업 열림 방지(false: 팝업 열림, true: 팝업 안열림)
+                // },
+                selectable: true,   // 사용자가 선택하고 취소되는 시점 모니터링
+                headerToolbar: {
+                    left: 'prev next',
+                    center: 'title',
+                    right: 'dayGridMonth timeGridWeek timeGridDay'
+                },
+                views: {
+                    dayGridMonth: {
+                        titleFormat: {
+                            year: 'numeric',
+                            month: '2-digit'
+                        }
+                    }
+                },
+                buttonText: {
+                    today: '현재날짜',
+                    month: '월',
+                    week: '주',
+                    day: '일'
+                },
 
-            if (!validateDateTime()) {
-                // HTML5 기본 메시지 대신 invalid-feedback 이 보여짐
-                eventForm.reportValidity();        // 포커스 이동 + 빨간 테두리
-                return;                            // Fetch 보내지 않음
-            }
+                // 서버에서 일정 JSON 데이터 로드
+                events: (info) => {
+                    // info.start : 화면에 표시된 달력 첫날
+                    // 달력의 첫날은 매월 1일이 보장 안되기에(이전달의 30일 일수도) 10일정도 더해서 월 맞추기 위함
+                    const tenDaysMs = 10 * 24 * 60 * 60 * 1000;  // 10일
+                    const midDate = new Date(info.start.getTime() + tenDaysMs);
 
-            const url    = currentEventId
-                ? `/api/v1/calendar/events/${currentEventId}`
-                : '/api/v1/calendar/events';
-            const method = currentEventId ? 'PATCH' : 'POST';
+                    const y = midDate.getFullYear();      // 예: 2025
+                    const m = midDate.getMonth() + 1;     // 1~12
 
-            const formData = new FormData(eventForm);
-            const dataObj = Object.fromEntries(formData.entries());
+                    // GET 요청 → Promise 반환
+                    return fetch(`/api/v1/calendar/events/${y}/${m}`)
+                        .then(res => {
+                            if (!res.ok) throw new Error('네트워크 에러');
+                            return res.json();                // JSON 배열을 반환하는 Promise
+                        });
+                },
 
-            // 2) allDay 키가 없으면 기본 false 주입 (문자열 → boolean 변환 포함)
-            dataObj.isAllDay = document.getElementById('allDayCheck').checked; // true / false
+                // event 클릭 함수 정의 -> 일정 정보 (수정, 삭제 가능하도록)
+                eventClick: function (info) {
+                    currentEventId = info.event.id;
 
-            // 2) 등록 버튼 비활성화
-            submitBtn.disabled = true;
+                    // 서버에서 상세 정보 불러오기
+                    fetch(`/api/v1/calendar/events/${currentEventId}`)
+                        .then(response => {
+                            if (!response.ok) throw new Error('네트워크 응답 실패');
+                            return response.json();
+                        })
+                        .then(data => {
+                            // 모달 내부 요소에 데이터 채우기
+                            document.getElementById('modalTitle').textContent = data.title;
+                            document.getElementById('modalStart').textContent = formatKoreanDateTime(data.startDate);
+                            document.getElementById('modalEnd').textContent = formatKoreanDateTime(data.endDate);
+                            document.getElementById('modalDescription').textContent = data.description || '설명 없음';
 
-            // 1) 기본 헤더
-            const fetchHeaders = {
-                'Content-Type': 'application/json'
-            };
+                            // 수정 버튼에 eventId 속성으로 넣기
+                            document.getElementById('modalEditBtn').setAttribute('data-event-id', currentEventId);
 
-            // 2) CSRF 헤더가 유효하면 추가
-            if (header && token) {
-                fetchHeaders[header] = token;
-            }
+                            // 2) 권한이 있을 때만 버튼 보이기 (백엔드에서 isOwner 혹은 canEdit 필드 제공)
+                            if (data.isOwner) {
+                                modalEditBtn.style.display = '';
+                                modalDeleteBtn.style.display = '';
+                                modalEditBtn.setAttribute('data-event-id', currentEventId);
+                            } else {
+                                modalEditBtn.style.display = 'none';
+                                modalDeleteBtn.style.display = 'none';
+                            }
 
-            fetch(url, {
-                method: method,
-                headers: fetchHeaders,
-                body: JSON.stringify(dataObj)
-            })
-                .then(res => {
-                    if (!res.ok) throw new Error('서버 오류');
-                    return res.json().catch(() => null);
-                })
-                .then(() => {
+                            // Bootstrap 모달 표시
+                            detailEventModal.show();
+                        })
+                        .catch(err => {
+                            console.error('이벤트 상세 조회 중 오류:', err);
+                            showToast('이벤트 정보를 불러오는 데 실패했습니다.', 'error');
+                        });
+                },
+
+                // 날짜나 시간 클릭 시 발생 -> 일정 생성 폼 등록
+                dateClick: function (info) {
+                    // 등록 모드 진입 시 기존 ID 초기화
                     currentEventId = null;
-                    closeEventFormModal();      // 모달 닫기
-                    refreshCalendarEvents();    // 캘린더 갱신
-                })
-                .catch(err => {
-                    console.error(err);
-                    alert('요청에 실패했습니다.');
-                })
-                .finally(() => {
-                    submitBtn.disabled = false;
+                    // 전역 변수에 클릭한 날짜 저장
+                    anchorDate = info.dateStr;
+                    // 1) 모달 제목 설정 (등록 모드)
+                    document.getElementById('formModalTitle').textContent = '일정 등록';
+                    submitBtn.textContent = '등록하기';
+                    cancelBtn.textContent = '등록취소';
+                    // 2) 폼 리셋 & 일정 등록 버튼 활성화
+                    document.getElementById('eventForm').reset();
+                    resetValidation();
+                    submitBtn.disabled = false
+                    // 3) “종일” 체크 & 토글
+                    const allDayCheck = document.getElementById('allDayCheck');
+                    allDayCheck.checked = true;        // 종일 모드로 강제 전환
+
+                    // 4) 날짜 입력값을 클릭한 날짜로 초기화
+                    document.getElementById('inputStartDate').value = info.dateStr;
+                    document.getElementById('inputEndDate').value = info.dateStr;
+
+                    // 5) 모달 띄우기
+                    formModal.show();
+                }
+
+            });
+            calendar.render();
+            window.calendar = calendar;
+
+            // 5) 페이지 로드 직후에도 선택값 반영
+            onLeaveTypeChange();
+
+
+            // 1) Bootstrap 5 모달 닫기
+            function closeEventFormModal() {
+                formModal.hide();
+            }
+
+            // 2) FullCalendar 이벤트 다시 불러오기
+            function refreshCalendarEvents() {
+                calendar.refetchEvents();
+            }
+
+            // ➊ 검증 함수
+            function validateDateTime() {
+                const sd = startDateEl.value;        // "2025-07-30"
+                const ed = endDateEl.value;          // ""
+                const st = startTimeEl.value;        // "13:00"
+                const et = endTimeEl.value;
+
+                // 1) 날짜 비교
+                if (sd && ed && sd > ed) {           // YYYY-MM-DD는 문자열 비교 OK
+                    startDateEl.setCustomValidity('invalid-date');
+                    startDateEl.classList.add('is-invalid');
+                    return false;
+                }
+                // 2) 시간 비교 (allDay 아니어야 함)
+                if (!allDayCheck.checked && st && et && st >= et) {
+                    startTimeEl.setCustomValidity('invalid-time');
+                    startTimeEl.classList.add('is-invalid');
+                    return false;
+                }
+
+                /* 모두 통과 → 기존 오류 리셋 */
+                [startDateEl, startTimeEl].forEach(el => {
+                    el.setCustomValidity('');
+                    el.classList.remove('is-invalid');
                 });
+                return true;
+            }
+
+            // 폼 제출 이벤트 잡기 - form 태그 안에 button 있으면 제출
+            eventForm.addEventListener('submit', function (e) {
+                e.preventDefault();
+
+                if (!validateDateTime()) {
+                    // HTML5 기본 메시지 대신 invalid-feedback 이 보여짐
+                    eventForm.reportValidity();        // 포커스 이동 + 빨간 테두리
+                    return;                            // Fetch 보내지 않음
+                }
+
+                const url = currentEventId
+                    ? `/api/v1/calendar/events/${currentEventId}`
+                    : '/api/v1/calendar/events';
+                const method = currentEventId ? 'PATCH' : 'POST';
+
+                const formData = new FormData(eventForm);
+                const dataObj = Object.fromEntries(formData.entries());
+
+                // 2) allDay 키가 없으면 기본 false 주입 (문자열 → boolean 변환 포함)
+                dataObj.isAllDay = document.getElementById('allDayCheck').checked; // true / false
+
+                // 2) 등록 버튼 비활성화
+                submitBtn.disabled = true;
+
+                fetch(url, {
+                    method: method,
+                    headers: requestHeaders,
+                    body: JSON.stringify(dataObj)
+                })
+                    .then(res => {
+                        if (!res.ok) throw new Error('서버 오류');
+                        return res.json().catch(() => null);
+                    })
+                    .then(() => {
+                        showToast(currentEventId ? '수정에 성공했습니다.' : '등록에 성공했습니다.', 'success');
+                        currentEventId = null;
+                        closeEventFormModal();      // 모달 닫기
+                        refreshCalendarEvents();    // 캘린더 갱신
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        showToast('요청에 실패했습니다.', 'error');
+                    })
+                    .finally(() => {
+                        submitBtn.disabled = false;
+                    });
+            });
+
+            // 상세 모달의 “삭제” 버튼 클릭 → 삭제 확인 모달 띄우기
+            modalDeleteBtn.addEventListener('click', () => {
+                deleteConfirmModal.show();
+            });
+
+            // 삭제 확인 모달의 “삭제” 버튼 클릭 → API 호출, 모달 닫기, 캘린더 리프레시
+            confirmDeleteBtn.addEventListener('click', () => {
+                // 삭제 버튼 따닥 연속 클릭 안되게
+                confirmDeleteBtn.disabled = true;
+                const cancelDeleteBtn = document.querySelector('#deleteConfirmModal .btn-secondary');
+                cancelDeleteBtn.disabled = true;
+
+                fetch(`/api/v1/calendar/events/${currentEventId}`, {
+                    method: 'DELETE',
+                    headers: requestHeaders
+                })
+                    .then(res => {
+                        if (!res.ok) throw new Error('삭제 실패');
+                        deleteConfirmModal.hide();
+                        detailEventModal.hide();
+                        refreshCalendarEvents();
+                        showToast('일정 삭제 성공', 'success');
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        showToast('삭제 요청에 실패했습니다.', 'error');
+                    })
+                    .finally(() => {
+                        confirmDeleteBtn.disabled = false;
+                        cancelDeleteBtn.disabled = false;
+                    });
+            });
+
         });
 
-    });
-
-</script>
-
-</body>
+    </script>
+</div>
 </html>

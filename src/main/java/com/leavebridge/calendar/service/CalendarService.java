@@ -51,7 +51,10 @@ public class CalendarService {
 		LeaveAndHoliday leaveAndHoliday = leaveAndHolidayRepository.findById(eventId).orElseThrow(
 			() -> new IllegalArgumentException("존재하지 않는 일정 Id입니다."));
 
-		return MonthlyEventDetailResponse.from(leaveAndHoliday);
+		// TODO 로그인한 사용자가 있을때, 해당 일정을 작성자거나 관리자면 편집 가능하도록 검증
+		Boolean isOwer = true;
+
+		return MonthlyEventDetailResponse.of(leaveAndHoliday, isOwer);
 	}
 
 	/**
