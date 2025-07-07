@@ -2,7 +2,6 @@ package com.leavebridge.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -34,6 +33,7 @@ public class SecurityConfig {
 			.csrf(csrf -> csrf.disable())
 			.logout(
 				logout -> logout
+					.logoutUrl("/member/logout")
 					.logoutSuccessUrl("/")
 					.invalidateHttpSession(true)
 					.deleteCookies("JSESSIONID")
@@ -41,7 +41,8 @@ public class SecurityConfig {
 
 			.formLogin(
 				formLogin -> formLogin
-				.defaultSuccessUrl("/")
+					.loginPage("/member/login")
+					.defaultSuccessUrl("/")
 			)
 		;
 		return http.build();
