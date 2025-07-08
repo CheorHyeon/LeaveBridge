@@ -1,20 +1,24 @@
 package com.leavebridge.member.entitiy;
 
-import java.util.ArrayList;
+import java.time.LocalDateTime;
 import java.util.List;
 
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 import com.leavebridge.calendar.entity.LeaveAndHoliday;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -48,9 +52,29 @@ public class Member {
 	@ToString.Exclude
 	private List<LeaveAndHoliday> leaveAndHolidays;
 
+	@Column(name = "MEMBER_ROLE")
+	@Enumerated(EnumType.STRING)
+	private MemberRole memberRole;
+
+	@Column(name = "CREATED_DATE")
+	@CreatedDate
+	private LocalDateTime createdDate = LocalDateTime.now();
+
+	@Column(name = "UPDATED_DATE")
+	@LastModifiedDate
+	private LocalDateTime updatedDate;
+
 	public List<? extends GrantedAuthority> getGrantedAuthorities() {
-		List<GrantedAuthority> grantedAuthorities = new ArrayList<>();
-		grantedAuthorities.add(new SimpleGrantedAuthority("member"));
-		return grantedAuthorities;
+		return List.of(memberRole);
+	}
+
+	// 최초 생성 시 updatedDate는 null로
+	@PrePersist // 영속화 되기 직전 한번만 실행
+	public void onPrePersist() {
+		this.updatedDate = null;
+	}
+
+	public boolean isAdmin() {
+		return this.memberRole == MemberRole.ADMIN;
 	}
 }

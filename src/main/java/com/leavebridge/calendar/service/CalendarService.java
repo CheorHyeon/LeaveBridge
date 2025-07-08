@@ -23,6 +23,7 @@ import com.leavebridge.calendar.dto.MonthlyEvent;
 import com.leavebridge.calendar.dto.MonthlyEventDetailResponse;
 import com.leavebridge.calendar.dto.PatchLeaveRequestDto;
 import com.leavebridge.calendar.entity.LeaveAndHoliday;
+import com.leavebridge.calendar.enums.LeaveType;
 import com.leavebridge.calendar.repository.LeaveAndHolidayRepository;
 import com.leavebridge.member.entitiy.Member;
 import com.leavebridge.util.DateUtils;
@@ -36,7 +37,6 @@ import lombok.extern.slf4j.Slf4j;
 @Transactional(readOnly = true)
 public class CalendarService {
 	private final Calendar calendarClient;
-	private final static String GOOGLE_KOREA_HOLIDAY_CALENDAR_ID = "ko.south_korea#holiday@group.v.calendar.google.com";
 	private static final String DEFAULT_TIME_ZONE = "Asia/Seoul";
 	private final LeaveAndHolidayRepository leaveAndHolidayRepository;
 
@@ -46,15 +46,15 @@ public class CalendarService {
 	/**
 	 * 특정 이벤트의 상세 정보를 조회합니다.
 	 */
-	public MonthlyEventDetailResponse getEventDetails(Long eventId) {
+	public MonthlyEventDetailResponse getEventDetails(Long eventId, Member member) {
 
 		LeaveAndHoliday leaveAndHoliday = leaveAndHolidayRepository.findById(eventId).orElseThrow(
 			() -> new IllegalArgumentException("존재하지 않는 일정 Id입니다."));
 
-		// TODO 로그인한 사용자가 있을때, 해당 일정을 작성자거나 관리자면 편집 가능하도록 검증
-		Boolean isOwer = true;
+		boolean canAccess = checkOwnerOrAdminMember(member, leaveAndHoliday);
+		boolean cantModifyLeave = leaveAndHoliday.canModifyLeave();
 
-		return MonthlyEventDetailResponse.of(leaveAndHoliday, isOwer);
+		return MonthlyEventDetailResponse.of(leaveAndHoliday, canAccess && cantModifyLeave);
 	}
 
 	/**
@@ -79,9 +79,7 @@ public class CalendarService {
 	 * 지정된 calendarId에 연차를 등록합니다.
 	 */
 	@Transactional
-	public void createTimedEvent(CreateLeaveRequestDto requestDto) throws IOException {
-		// TODO : Security 에서 user 정보 꺼내서 id 넣도록 수정
-		Member dummyMember = Member.builder().id(4L).build();
+	public void createTimedEvent(CreateLeaveRequestDto requestDto, Member member) throws IOException {
 		// 1) Event 객체 생성 및 기본 정보 설정
 		Event event = new Event().setSummary(requestDto.title());
 
@@ -101,7 +99,7 @@ public class CalendarService {
 			// 시간 지정
 			DateTime startDt = new DateTime(Date.from(
 				startLdt.atZone(ZoneId.of(DEFAULT_TIME_ZONE)).toInstant()));
-			DateTime endDt   = new DateTime(Date.from(
+			DateTime endDt = new DateTime(Date.from(
 				endLdt.atZone(ZoneId.of(DEFAULT_TIME_ZONE)).toInstant()));
 			event.setStart(new EventDateTime().setDateTime(startDt));
 			event.setEnd(new EventDateTime().setDateTime(endDt));
@@ -113,7 +111,7 @@ public class CalendarService {
 			.execute();
 
 		try {
-			LeaveAndHoliday entity = LeaveAndHoliday.of(requestDto, dummyMember, created.getId());
+			LeaveAndHoliday entity = LeaveAndHoliday.of(requestDto, member, created.getId());
 			leaveAndHolidayRepository.saveAndFlush(entity);
 		} catch (RuntimeException dbException) {
 			// 캘린더에 저장된거 삭제
@@ -130,16 +128,16 @@ public class CalendarService {
 	}
 
 	/**
-	 * 기존 이벤트(eventId)의 시작/종료 시각을 업데이트합니다.
+	 * 기존 이벤트(eventId)를 수정합니다.
 	 */
 	@Transactional
-	public void updateEventDate(Long eventId, PatchLeaveRequestDto dto) throws IOException {
-		log.info("new updateEventDate :: event Id = {}, dtp = {}", eventId, dto);
-
+	public void updateEventDate(Long eventId, PatchLeaveRequestDto dto, Member member) throws IOException {
 		LeaveAndHoliday leaveAndHoliday = leaveAndHolidayRepository.findById(eventId)
 			.orElseThrow(() -> new IllegalArgumentException("해당 Id를 가진 이벤트가 없습니다."));
 
-		// TODO : 사용자 & 로직 검증 추가
+		checkOwnerOrAdmin(member, leaveAndHoliday);
+
+		checkHolidayUpdateAllowed(leaveAndHoliday);
 
 		// 1) 엔티티 수정
 		leaveAndHoliday.patchEntityByDto(dto);
@@ -176,11 +174,62 @@ public class CalendarService {
 	}
 
 	/**
+	 * 지정한 이벤트(eventId)를 삭제합니다.
+	 */
+	@Transactional
+	public void deleteEvent(Long eventId, Member member) throws IOException {
+		LeaveAndHoliday leaveAndHoliday = leaveAndHolidayRepository.findById(eventId)
+			.orElseThrow(() -> new IllegalArgumentException("해당 Id를 가진 이벤트가 없습니다."));
+
+		checkOwnerOrAdmin(member, leaveAndHoliday);
+
+		checkHolidayUpdateAllowed(leaveAndHoliday);
+
+		// 1) DB 삭제 우선
+		leaveAndHolidayRepository.delete(leaveAndHoliday);
+
+		// 2) 캘린더 삭제 -> 이미 삭제된거는 DB 삭제만 처리하면 되니까
+		try {
+			calendarClient.events()
+				// 객체는 아직 살아있기에 꺼내오기 가능
+				.delete(GOOGLE_PERSONAL_CALENDAR_ID, leaveAndHoliday.getGoogleEventId())
+				.execute();
+		} catch (GoogleJsonResponseException e) {
+			switch (e.getStatusCode()) {
+				case 404 -> log.error("삭제할 이벤트를 찾을 수 없습니다. eventId={}", eventId);
+				case 410 -> log.error("이미 삭제된 이벤트입니다. eventId={}", eventId);
+				default -> throw new RuntimeException("예외 발생으로 삭제 불가", e);
+			}
+		}
+	}
+
+	/**
+	 * 공휴일 검증
+	 */
+	private void checkHolidayUpdateAllowed(LeaveAndHoliday leaveAndHoliday) {
+		if (leaveAndHoliday.getLeaveType() == LeaveType.HOLIDAY || leaveAndHoliday.getLeaveType() == LeaveType.OTHER_PEOPLE) {
+			throw new IllegalArgumentException("공휴일 이벤트와 비회원 이벤트는 조작할 수 없습니다.");
+		}
+	}
+
+	/**
+	 * 관리자 혹은 일정 등록자인지 검증
+	 */
+	private void checkOwnerOrAdmin(Member member, LeaveAndHoliday leaveAndHoliday) {
+		if (!checkOwnerOrAdminMember(member, leaveAndHoliday)) {
+			log.info("login Id = {} 가 관리자도 아닌데 다른 일정 수정하려 시도 (비정상 접근)", member.getLoginId());
+			throw new IllegalArgumentException("해당 일정 작성자 혹은 관리자만 일정을 수정할 수 있습니다.");
+		}
+	}
+
+	/**
 	 * apiEvent에 dto의 변경값을 적용하고, 하나라도 바뀌면 true 반환
 	 */
 	private boolean applyAllChanges(Event apiEvent, PatchLeaveRequestDto dto) {
 		boolean changed = false;
 		// |= 복합대입 연산자 사용해서 true가 한번이라도 나오면 무조건 true로 반환하도록
+		// |= 연산자는 불리언에서 비단락 평가 논리합 연산 - 단락 평가(short-circuit) 하지 않아 오른쪽도 항상 검사
+		// -> 즉 제목 변경이 이미 되었지만, 설명이나 일정도 변경되었을 수 있기에 메소드 무조건 실행하긴 함
 
 		// 1) summary(제목) 검사/적용
 		changed |= updateSummaryIfChanged(apiEvent, dto);
@@ -247,13 +296,13 @@ public class CalendarService {
 			currentStart = LocalDate
 				.parse(apiEvent.getStart().getDate().toString())   // "2025-07-28"
 				.atStartOfDay();                                   // 2025-07-28T00:00
-			currentEnd   = LocalDate
+			currentEnd = LocalDate
 				.parse(apiEvent.getEnd().getDate().toString())     // 구글은 다음날 00:00 저장
 				.atStartOfDay();                                   // 2025-07-29T00:00
 		} else {
 			/* 시간 지정 일정 ─ millisecond epoch 값 → LocalDateTime */
 			currentStart = DateUtils.convertToLocalDateTime(apiEvent.getStart().getDateTime().getValue());
-			currentEnd   = DateUtils.convertToLocalDateTime(apiEvent.getEnd().getDateTime().getValue());
+			currentEnd = DateUtils.convertToLocalDateTime(apiEvent.getEnd().getDateTime().getValue());
 		}
 
 		// ---------- 3) 변동 여부 확인 ----------
@@ -288,7 +337,7 @@ public class CalendarService {
 		else {
 			DateTime startDt = new DateTime(
 				Date.from(wantedStart.atZone(zone).toInstant())); // 2025-07-28T13:00:00+09:00
-			DateTime endDt   = new DateTime(
+			DateTime endDt = new DateTime(
 				Date.from(wantedEnd.atZone(zone).toInstant()));   // 2025-07-28T17:00:00+09:00
 
 			apiEvent.setStart(new EventDateTime()
@@ -305,33 +354,13 @@ public class CalendarService {
 		return true;
 	}
 
-	/**
-	 * 지정한 이벤트(eventId)를 삭제합니다.
-	 */
-	@Transactional
-	public void deleteEvent(Long eventId) throws IOException {
-		log.info("deleteEvent :: event Id = {}", eventId);
-
-		LeaveAndHoliday leaveAndHoliday = leaveAndHolidayRepository.findById(eventId)
-			.orElseThrow(() -> new IllegalArgumentException("해당 Id를 가진 이벤트가 없습니다."));
-
-		// TODO : 사용자 & 로직 검증 추가
-
-		// 1) DB 삭제 우선
-		leaveAndHolidayRepository.delete(leaveAndHoliday);
-
-		// 2) 캘린더 삭제 -> 이미 삭제된거는 DB 삭제만 처리하면 되니까
-		try {
-			calendarClient.events()
-				// 객체는 아직 살아있기에 꺼내오기 가능
-				.delete(GOOGLE_PERSONAL_CALENDAR_ID, leaveAndHoliday.getGoogleEventId())
-				.execute();
-		} catch (GoogleJsonResponseException e) {
-			switch (e.getStatusCode()) {
-				case 404 -> log.error("삭제할 이벤트를 찾을 수 없습니다. eventId={}", eventId);
-				case 410 -> log.error("이미 삭제된 이벤트입니다. eventId={}", eventId);
-				default -> throw new RuntimeException("예외 발생으로 삭제 불가", e);
-			}
+	private boolean checkOwnerOrAdminMember(Member member, LeaveAndHoliday leaveAndHoliday) {
+		// 로그인 안했으면 그냥 나가리
+		if(member == null) {
+			return false;
 		}
+		boolean isAdmin = member.isAdmin();
+		boolean isOwer = leaveAndHoliday.isOwnedBy(member);
+		return isOwer || isAdmin;
 	}
 }

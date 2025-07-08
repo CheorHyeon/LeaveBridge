@@ -24,13 +24,13 @@ public class SecurityConfig {
 		http
 			.authorizeHttpRequests((authorizeHttpRequests) -> authorizeHttpRequests
 				// .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-				// .requestMatchers(HttpMethod.POST, "/api/*/member/login").permitAll() // 로그인은 누구나 가능
-				// .requestMatchers(HttpMethod.GET, "/").permitAll() // 메인 페이지 누구나 가능
-				// // 예외 처리 로직 없을 때 Tomcat이 포워딩 하는 경로 접근 허용하여 예외 메세지 잘 전달되도록 허용
+				.requestMatchers("/", "/member/login", "/css/**", "/js/**").permitAll()
+				.requestMatchers("/api/*/calendar/events/*/*").permitAll() // 일정 조회
+				.requestMatchers("/member/login").permitAll() // 메인 페이지 누구나 가능
+				.requestMatchers("/usage").permitAll() // 연차 사용 현황 누구나 가능
 				.requestMatchers("/error").permitAll()
-				.anyRequest().permitAll() // 나머지는 인증된 사용자만 가능
+				.anyRequest().authenticated() // 나머지는 인증된 사용자만 가능
 			)
-			.csrf(csrf -> csrf.disable())
 			.logout(
 				logout -> logout
 					.logoutUrl("/member/logout")
@@ -42,7 +42,8 @@ public class SecurityConfig {
 			.formLogin(
 				formLogin -> formLogin
 					.loginPage("/member/login")
-					.defaultSuccessUrl("/")
+					.permitAll()
+					.defaultSuccessUrl("/", true)
 			)
 		;
 		return http.build();

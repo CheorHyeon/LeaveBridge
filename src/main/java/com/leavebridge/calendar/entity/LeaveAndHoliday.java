@@ -170,4 +170,13 @@ public class LeaveAndHoliday {
 	public void onPrePersist() {
 		this.updatedDate = null;
 	}
+
+	// 프록시 객체 (leaveAndHoliday 속 member) 는 id는 가지고 있으니 쿼리 없이 검사하기 위함
+	public boolean isOwnedBy(Member member) {
+		return member != null && this.member.getId().equals(member.getId());
+	}
+
+	public boolean canModifyLeave(){
+		return !leaveType.equals(LeaveType.HOLIDAY) && !leaveType.equals(LeaveType.OTHER_PEOPLE);
+	}
 }
