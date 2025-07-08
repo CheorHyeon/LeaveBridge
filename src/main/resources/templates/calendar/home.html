@@ -176,18 +176,6 @@
     <div id='calendar'></div>
 
     <script>
-
-        // Vanilla JS로 CSRF 메타 태그를 꺼내되, 없으면 빈 문자열('')
-        const header = document
-                .querySelector("meta[name='_csrf_header']")
-                ?.getAttribute("content")
-            ?? "";
-
-        const token = document
-                .querySelector("meta[name='_csrf']")
-                ?.getAttribute("content")
-            ?? "";
-
         /**
          * 오늘 날짜를 'YYYY-MM-DD' 형식의 문자열로 반환합니다.
          * @returns {string} 포맷된 날짜 문자열
@@ -538,6 +526,11 @@
 
                 // 날짜나 시간 클릭 시 발생 -> 일정 생성 폼 등록
                 dateClick: function (info) {
+                    // ➊ 로그인하지 않은 경우
+                    if (!window.isAuthenticated) {
+                        showToast('일정 등록은 로그인 후 가능합니다.', 'warning');
+                        return;
+                    }
                     // 등록 모드 진입 시 기존 ID 초기화
                     currentEventId = null;
                     // 전역 변수에 클릭한 날짜 저장
