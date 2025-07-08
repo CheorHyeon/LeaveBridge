@@ -73,4 +73,8 @@ public class Member {
 	public void onPrePersist() {
 		this.updatedDate = null;
 	}
+
+	public boolean isAdmin() {
+		return this.memberRole == MemberRole.ADMIN;
+	}
 }
