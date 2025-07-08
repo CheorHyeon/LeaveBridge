@@ -34,8 +34,8 @@ public class CalendarController {
 	 * 이번달 구글 캘린더 등록 이벤트 조회
 	 */
 	@GetMapping("/events/{year}/{month}")
-	public ResponseEntity<List<MonthlyEvent>> getUpcomingEvents(@PathVariable Integer year,
-		@PathVariable Integer month) throws Exception {
+	public ResponseEntity<List<MonthlyEvent>> getUpcomingEvents(@PathVariable("year") Integer year,
+		@PathVariable("month") Integer month) throws Exception {
 		log.info("getUpcomingEvents :: year={}, month={}", year, month);
 		List<MonthlyEvent> events = calendarService.listMonthlyEvents(year, month);
 		return ResponseEntity.ok(events);
