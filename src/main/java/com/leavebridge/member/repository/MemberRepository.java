@@ -15,7 +15,7 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
         select distinct m
         from Member m
         left join fetch m.leaveAndHolidays l
-        where m.name not like '%마스터유저%'
+        where m.id != 4
         """)
 	List<Member> findAllWithLeaves();
 }

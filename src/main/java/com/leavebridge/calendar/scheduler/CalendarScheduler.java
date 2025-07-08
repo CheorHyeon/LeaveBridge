@@ -37,7 +37,7 @@ public class CalendarScheduler {
 	@Value("${google.calendar-id}")
 	private String GOOGLE_PERSONAL_CALENDAR_ID;
 
-	private final Member dummyMember = Member.builder().id(4L).build();
+	private final Member adminMember = Member.builder().id(4L).build();
 
 	private final static String GOOGLE_KOREA_HOLIDAY_CALENDAR_ID = "ko.south_korea#holiday@group.v.calendar.google.com";
 
@@ -105,7 +105,7 @@ public class CalendarScheduler {
 		// 3) 신규 이벤트만 매핑 후 저장
 		List<LeaveAndHoliday> toSave = events.stream()
 			.filter(e -> !existingIds.contains(e.getId()))
-			.map(e -> LeaveAndHoliday.of(e, dummyMember, type))
+			.map(e -> LeaveAndHoliday.of(e, adminMember, type))
 			.sorted(Comparator.comparing(LeaveAndHoliday::getStartDate))
 			.toList();
 
