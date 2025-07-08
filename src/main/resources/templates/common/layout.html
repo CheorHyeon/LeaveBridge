@@ -88,6 +88,37 @@
 </div>
 <!-- 공통 스크립트 -->
 <script>
+
+    // fetch 요청 리다이렉트 적용되도록 오버라이드
+    (() => {
+        // 원본 fetch 저장
+        const _fetch = window.fetch;
+
+        // 전역 fetch 오버라이드
+        window.fetch = function(input, init = {}) {
+            // credentials: 'include' 를 기본값으로 추가(쿠키 인증을 위해)
+            init.credentials = init.credentials || 'include';
+
+            return _fetch(input, init)
+                .then(response => {
+                    // 401 Unauthorized 또는 리다이렉트 감지
+                    if (response.status === 401 || response.redirected) {
+                        // 로그인 페이지로 전체 네비게이션
+                        window.location.href = '/member/login';
+                        // 이후 체인 중단
+                        return Promise.reject(new Error('Redirecting to login'));
+                    }
+                    return response;
+                })
+                .catch(err => {
+                    // 네트워크 오류 등도 여기서 처리 가능
+                    console.error('Global fetch error:', err);
+                    throw err;
+                });
+        };
+    })();
+
+
     // Vanilla JS로 CSRF 메타 태그를 꺼내되, 없으면 빈 문자열('')
     const header = document
             .querySelector("meta[name='_csrf_header']")
