@@ -6,7 +6,9 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 @Getter
 public enum LeaveType {
-	HOLIDAY("공휴일", false),
+	PUBLIC_HOLIDAY("공휴일", false),
+
+	ANNIVERSARY("기념일", false),
 
 	FULL_DAY_LEAVE("1일 연차", true),
 
