@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
-import java.util.Comparator;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -18,8 +17,8 @@ import com.google.api.services.calendar.Calendar;
 import com.google.api.services.calendar.model.Event;
 import com.google.api.services.calendar.model.Events;
 import com.leavebridge.calendar.entity.LeaveAndHoliday;
-import com.leavebridge.calendar.enums.LeaveType;
 import com.leavebridge.calendar.repository.LeaveAndHolidayRepository;
+import com.leavebridge.calendar.service.ExternalEventSyncService;
 import com.leavebridge.member.entitiy.Member;
 
 import lombok.RequiredArgsConstructor;
@@ -33,13 +32,12 @@ public class CalendarScheduler {
 	private final Calendar calendarClient;
 	private static final String DEFAULT_TIME_ZONE = "Asia/Seoul";
 	private final LeaveAndHolidayRepository leaveAndHolidayRepository;
+	private final ExternalEventSyncService externalEventSyncService;
 
 	@Value("${google.calendar-id}")
 	private String GOOGLE_PERSONAL_CALENDAR_ID;
 
-	private final Member adminMember = Member.builder().id(4L).build();
-
-	private final static String GOOGLE_KOREA_HOLIDAY_CALENDAR_ID = "ko.south_korea#holiday@group.v.calendar.google.com";
+	public static Member adminMember = Member.builder().id(4L).build();
 
 	// @Scheduled(cron = "0 */1 * * * *") //1분마다 적용 확인을 위해 일단 달아둠
 	@Scheduled(cron = "0 0 0 * * *")
@@ -74,61 +72,16 @@ public class CalendarScheduler {
 
 		List<Event> items = events.getItems();
 
-		processAndSaveNewEvents(items, LeaveType.OTHER_PEOPLE);
+		externalEventSyncService.processAndSaveNewEvents(items);
 	}
 
 	// @Scheduled(cron = "0 */1 * * * *") //1분마다 적용 확인을 위해 일단 달아둠
-	@Scheduled(cron = "0 0 4 1 * *")
+	@Scheduled(cron = "0 0 4 1 * *") // 매달 1일 새벽 4시 실행
 	@Retryable(value = Exception.class, maxAttempts = 3, backoff = @Backoff(delay = 2000))
-	public void getHolidaysRegularly() throws IOException {
-
-		log.info("getHolidaysRegularly :: {}", LocalDateTime.now());
-
-		Events holidaysEvents = calendarClient.events().list(GOOGLE_KOREA_HOLIDAY_CALENDAR_ID).execute();
-
-		List<Event> items = holidaysEvents.getItems();
-
-		processAndSaveNewEvents(items, LeaveType.HOLIDAY);
+	public void syncHolidaysMonthly() throws IOException {
+		log.info("syncHolidaysMonthly :: {}", LocalDateTime.now());
+		List<LeaveAndHoliday> sortedNewLeaveAndHolidayEntities = externalEventSyncService.syncNextYears(2);
+		leaveAndHolidayRepository.saveAll(sortedNewLeaveAndHolidayEntities);
 	}
 
-	private void processAndSaveNewEvents(List<Event> events, LeaveType type) {
-		if (events.isEmpty()) {
-			return;
-		}
-
-		// 1) 이벤트 ID 추출
-		List<String> eventIds = extractEventIds(events);
-
-		// 2) DB에 이미 있는 ID 조회
-		List<String> existingIds = findExistingEventIds(eventIds);
-
-		// 3) 신규 이벤트만 매핑 후 저장
-		List<LeaveAndHoliday> toSave = events.stream()
-			.filter(e -> !existingIds.contains(e.getId()))
-			.map(e -> LeaveAndHoliday.of(e, adminMember, type))
-			.sorted(Comparator.comparing(LeaveAndHoliday::getStartDate))
-			.toList();
-
-		leaveAndHolidayRepository.saveAll(toSave);
-	}
-
-	/**
-	 * 이벤트 리스트에서 Google Event ID만 추출
-	 */
-	private List<String> extractEventIds(List<Event> events) {
-		return events.stream()
-			.map(Event::getId)
-			.toList();
-	}
-
-	/**
-	 * DB에 이미 저장된 Google Event ID 목록 조회
-	 */
-	private List<String> findExistingEventIds(List<String> eventIds) {
-		return leaveAndHolidayRepository
-			.findAllByGoogleEventIdIn(eventIds)
-			.stream()
-			.map(LeaveAndHoliday::getGoogleEventId)
-			.toList();
-	}
 }

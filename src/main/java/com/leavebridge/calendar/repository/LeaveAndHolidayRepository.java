@@ -12,4 +12,5 @@ import com.leavebridge.calendar.entity.LeaveAndHoliday;
 public interface LeaveAndHolidayRepository extends JpaRepository<LeaveAndHoliday, Long> {
 	List<LeaveAndHoliday> findAllByGoogleEventIdIn(List<String> eventIds);
 	List<LeaveAndHoliday> findAllByStartDateGreaterThanEqualAndStartDateLessThan(LocalDate start, LocalDate end);
+	List<LeaveAndHoliday> findAllByStartDateBetween(LocalDate yearStart, LocalDate yearEnd);
 }

@@ -7,6 +7,7 @@ import java.time.ZoneId;
 import java.util.Date;
 import java.util.List;
 
+import com.google.api.services.calendar.model.Events;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -207,7 +208,7 @@ public class CalendarService {
 	 * 공휴일 검증
 	 */
 	private void checkHolidayUpdateAllowed(LeaveAndHoliday leaveAndHoliday) {
-		if (leaveAndHoliday.getLeaveType() == LeaveType.HOLIDAY || leaveAndHoliday.getLeaveType() == LeaveType.OTHER_PEOPLE) {
+		if (leaveAndHoliday.getLeaveType() == LeaveType.PUBLIC_HOLIDAY || leaveAndHoliday.getLeaveType() == LeaveType.OTHER_PEOPLE) {
 			throw new IllegalArgumentException("공휴일 이벤트와 비회원 이벤트는 조작할 수 없습니다.");
 		}
 	}

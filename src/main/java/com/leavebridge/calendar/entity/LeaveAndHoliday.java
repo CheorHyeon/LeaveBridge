@@ -93,6 +93,9 @@ public class LeaveAndHoliday {
 	@LastModifiedDate
 	private LocalDateTime updatedDate;
 
+	@Column(name = "IS_HOLIDAY")
+	private Boolean isHoliday;
+
 	public static LeaveAndHoliday of(Event event, Member member, LeaveType leaveType) {
 
 		LocalDateTime start = DateUtils.parseDateTime(event.getStart(), true);
@@ -177,6 +180,6 @@ public class LeaveAndHoliday {
 	}
 
 	public boolean canModifyLeave(){
-		return !leaveType.equals(LeaveType.HOLIDAY) && !leaveType.equals(LeaveType.OTHER_PEOPLE);
+		return !leaveType.equals(LeaveType.PUBLIC_HOLIDAY) && !leaveType.equals(LeaveType.OTHER_PEOPLE);
 	}
 }

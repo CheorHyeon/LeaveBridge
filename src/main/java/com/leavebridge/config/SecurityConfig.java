@@ -29,7 +29,7 @@ public class SecurityConfig {
 				.requestMatchers("/member/login").permitAll() // 메인 페이지 누구나 가능
 				.requestMatchers("/usage").permitAll() // 연차 사용 현황 누구나 가능
 				.requestMatchers("/error").permitAll()
-				.anyRequest().authenticated() // 나머지는 인증된 사용자만 가능
+				.anyRequest().permitAll() // 나머지는 인증된 사용자만 가능
 			)
 			.logout(
 				logout -> logout

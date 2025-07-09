@@ -58,7 +58,7 @@ public class Member {
 
 	@Column(name = "CREATED_DATE")
 	@CreatedDate
-	private LocalDateTime createdDate = LocalDateTime.now();
+	private LocalDateTime createdDate;
 
 	@Column(name = "UPDATED_DATE")
 	@LastModifiedDate
