@@ -46,7 +46,7 @@ public record PatchLeaveRequestDto(
 			// 타입이 전일 전용이면 강제 전일
 			if (leaveType == LeaveType.FULL_DAY_LEAVE ||
 				leaveType == LeaveType.SUMMER_VACATION ||
-				leaveType == LeaveType.HOLIDAY) {
+				leaveType == LeaveType.PUBLIC_HOLIDAY) {
 				isAllDay = true;
 			}
 		}
