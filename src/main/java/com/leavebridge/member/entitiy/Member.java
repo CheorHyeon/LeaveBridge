@@ -75,6 +75,6 @@ public class Member {
 	}
 
 	public boolean isAdmin() {
-		return this.memberRole == MemberRole.ADMIN;
+		return this.memberRole == MemberRole.ROLE_ADMIN;
 	}
 }
