@@ -75,6 +75,10 @@ public class Member {
 	}
 
 	public boolean isAdmin() {
-		return this.memberRole == MemberRole.ADMIN;
+		return this.memberRole == MemberRole.ROLE_ADMIN;
+	}
+
+	public void updatePassword(String encodedPassword) {
+		this.password = encodedPassword;
 	}
 }

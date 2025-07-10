@@ -7,7 +7,6 @@ import java.time.ZoneId;
 import java.util.Date;
 import java.util.List;
 
-import com.google.api.services.calendar.model.Events;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -113,6 +112,7 @@ public class CalendarService {
 
 		try {
 			LeaveAndHoliday entity = LeaveAndHoliday.of(requestDto, member, created.getId());
+			entity.updateIsHoliday(requestDto.isHolidayInclude()); // 휴가 포함인지 여부
 			leaveAndHolidayRepository.saveAndFlush(entity);
 		} catch (RuntimeException dbException) {
 			// 캘린더에 저장된거 삭제
@@ -142,6 +142,7 @@ public class CalendarService {
 
 		// 1) 엔티티 수정
 		leaveAndHoliday.patchEntityByDto(dto);
+		leaveAndHoliday.updateIsHoliday(dto.isHolidayInclude()); // 휴가 포함인지 여부
 
 		String googleEventId = leaveAndHoliday.getGoogleEventId();
 

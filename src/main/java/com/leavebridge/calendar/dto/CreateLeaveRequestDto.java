@@ -23,9 +23,10 @@ public record CreateLeaveRequestDto(
 	LocalTime startTime,
 	@Schema(description = "종료 날짜 시간", example = "23:59")
 	LocalTime endTime,
-
 	@Schema(description = "비고", example = "일정 설명 텍스트")
-	String description
+	String description,
+	@Schema(description = "휴일 포함 여부", example = "true(휴일 포함), false(휴일 미포함)")
+	Boolean isHolidayInclude
 ) {
 	public CreateLeaveRequestDto {
 		if (!Boolean.TRUE.equals(isAllDay)) {

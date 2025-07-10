@@ -23,7 +23,10 @@ public record MonthlyEvent(
 	LocalDateTime end,
 
 	@Schema(description = "하루 종일 일정인지", example = "true or false")
-	boolean allDay
+	boolean allDay,
+
+	@Schema(description = "휴일인지 여부", example = "true or false")
+	Boolean isHoliday
 ) {
 	public static MonthlyEvent from(LeaveAndHoliday leaveAndHoliday) {
 		return MonthlyEvent.builder()
@@ -32,6 +35,7 @@ public record MonthlyEvent(
 			.start(LocalDateTime.of(leaveAndHoliday.getStartDate(), leaveAndHoliday.getStarTime()))
 			.end(LocalDateTime.of(leaveAndHoliday.getEndDate(), leaveAndHoliday.getEndTime()))
 			.allDay(leaveAndHoliday.getIsAllDay())
+			.isHoliday(leaveAndHoliday.getIsHoliday())
 			.build();
 	}
 }

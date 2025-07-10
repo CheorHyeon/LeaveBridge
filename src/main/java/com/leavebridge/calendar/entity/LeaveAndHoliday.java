@@ -182,4 +182,8 @@ public class LeaveAndHoliday {
 	public boolean canModifyLeave(){
 		return !leaveType.equals(LeaveType.PUBLIC_HOLIDAY) && !leaveType.equals(LeaveType.OTHER_PEOPLE);
 	}
+
+	public void updateIsHoliday(Boolean isHoliday) {
+		this.isHoliday = Boolean.TRUE.equals(isHoliday);
+	}
 }
