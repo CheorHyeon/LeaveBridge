@@ -7,6 +7,9 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 
+import org.apache.coyote.BadRequestException;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,6 +17,7 @@ import com.leavebridge.calendar.entity.LeaveAndHoliday;
 import com.leavebridge.calendar.repository.LeaveAndHolidayRepository;
 import com.leavebridge.member.dto.LeaveDetailDto;
 import com.leavebridge.member.dto.MemberUsedLeavesResponseDto;
+import com.leavebridge.member.dto.RequestChangePasswordRequest;
 import com.leavebridge.member.entitiy.Member;
 import com.leavebridge.member.repository.MemberRepository;
 
@@ -28,6 +32,7 @@ public class MemberService {
 
 	private final MemberRepository memberRepository;
 	private final LeaveAndHolidayRepository leaveRepository;
+	private final PasswordEncoder passwordEncoder;
 
 	private static final LocalTime WORK_START = LocalTime.of(8, 0, 0);
 	private static final LocalTime WORK_END = LocalTime.of(17, 0, 0);
@@ -158,4 +163,18 @@ public class MemberService {
 			   && !end.toLocalTime().isAfter(LUNCH_END);       // end   ≤ 13:00
 	}
 
+	@Transactional
+	public void changePassword(Member member, RequestChangePasswordRequest request) {
+		// 1) 현재 비밀번호 맞는지 확인
+		if (!passwordEncoder.matches(request.currentPassword(), member.getPassword())) {
+			throw new IllegalArgumentException("현재 비밀번호가 올바르지 않습니다.");
+		}
+
+		// 2) 새 비밀번호·확인 일치 확인
+		if (!request.newPassword().equals(request.confirmPassword())) {
+			throw new IllegalArgumentException("새 비밀번호와 확인 비밀번호가 일치하지 않습니다.");
+		}
+
+		member.updatePassword(passwordEncoder.encode(request.newPassword()));
+	}
 }
