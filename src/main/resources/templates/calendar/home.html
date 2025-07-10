@@ -31,12 +31,25 @@
                                required>
                     </div>
 
-                    <!-- 종일 체크박스 -->
-                    <div class="form-check mb-3">
-                        <input class="form-check-input" type="checkbox" id="allDayCheck" name="isAllDay" value="true">
-                        <label class="form-check-label" for="allDayCheck">
-                            하루 종일 여부(All Day)
-                        </label>
+                    <!-- 종일+휴일 포함 체크박스 그룹 -->
+                    <div class="d-flex align-items-center mb-3">
+                        <!-- allDay -->
+                        <div class="form-check form-check-inline me-3 mb-0">
+                            <input class="form-check-input" type="checkbox"
+                                   id="allDayCheck" name="isAllDay" value="true">
+                            <label class="form-check-label" for="allDayCheck">
+                                하루 종일 여부(All Day)
+                            </label>
+                        </div>
+                        <!-- holidayInclude (관리자만) -->
+                        <div class="form-check form-check-inline mb-0"
+                             sec:authorize="hasRole('ADMIN')">
+                            <input class="form-check-input" type="checkbox"
+                                   id="holidayIncludeCheck" name="isHolidayInclude" value="true">
+                            <label class="form-check-label" for="holidayIncludeCheck">
+                                휴일 포함 여부
+                            </label>
+                        </div>
                     </div>
 
                     <div class="mb-3">
@@ -50,9 +63,14 @@
                             <option value="SUMMER_VACATION">여름휴가</option>
                             <option value="NON_DEDUCTIBLE">비차감 휴가(공가)</option>
                             <option value="MEETING">회의</option>
+                            <option sec:authorize="hasRole('ADMIN')" value="PUBLIC_HOLIDAY">공휴일</option>
+                            <option sec:authorize="hasRole('ADMIN')" value="ANNIVERSARY">기념일</option>
                         </select>
                         <div class="form-text fw-bold">
                             한 번에 하나의 연차 타입만 등록 가능합니다. 다른 타입은 별도 등록해 주세요.
+                        </div>
+                        <div class="form-text fw-bold" sec:authorize="hasRole('ADMIN')" id="holidayNotice" style="display: none;">
+                            휴일 포함 체크시 해당 기간동안 연차 등록이 불가능합니다.
                         </div>
                     </div>
 
@@ -127,7 +145,17 @@
                                 <dt class="col-sm-3">
                                     <i class="bi bi-card-text me-1"></i>설명
                                 </dt>
-                                <dd id="modalDescription" class="col-sm-9">세부 일정 및 준비물</dd>
+                                <dd id="modalDescription" class="col-sm-9">설명 없음</dd>
+
+                                <!-- 휴일 표시: isHoliday가 true일 때만 -->
+                                <dt class="col-sm-3" id="modalHolidayLabel" style="display:none">
+                                    <i class="bi bi-calendar-event-fill me-1"></i>휴일
+                                </dt>
+                                <dd class="col-sm-9" id="modalHolidayInfo" style="display:none">
+                                    <!-- allDay일 때와 아닐 때 구분 -->
+                                    <span id="modalHolidayText"></span>
+                                </dd>
+
                             </dl>
                         </div>
                     </div>
@@ -257,7 +285,14 @@
             const modalDeleteBtn = document.getElementById('modalDeleteBtn');
             const deleteConfirmModal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
             const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+            const allDayCheck         = document.getElementById('allDayCheck');
+            const holidayIncludeCheck = document.getElementById('holidayIncludeCheck');
+            const holidayIncludeGroup = holidayIncludeCheck?.closest('.form-check');
+            const holidayNotice = document.getElementById('holidayNotice');
 
+            if (holidayIncludeGroup) {
+                holidayIncludeGroup.style.display = 'none';
+            }
             let currentEventId = null;  // 수정 중인 이벤트 ID 보관
 
             allDayCheck.addEventListener('change', onModifyToggleAllDayChange);
@@ -283,8 +318,20 @@
 
             // 3) leaveType 변경 시 UI 조정
             function onLeaveTypeChange() {
+                const isHoliday = ['PUBLIC_HOLIDAY','ANNIVERSARY'].includes(leaveTypeEl.value);
                 const currentType = leaveTypeEl.value;
 
+                // holidayIncludeCheck 요소가 실제로 존재할 때만 동작
+                if (typeof holidayIncludeCheck !== 'undefined' && holidayIncludeCheck !== null) {
+                    // 1) 공휴일/기념일일 때만 보이기
+                    holidayIncludeGroup.style.display = isHoliday ? '' : 'none';
+                    holidayNotice.style.display = isHoliday ? '' : 'none';
+
+                    // 2) 공휴일이 아니면 체크 해제
+                    if (!isHoliday) {
+                        holidayIncludeCheck.checked = false;
+                    }
+                }
                 // 0) 기본 리셋 (페어된 로직만 남김)
                 allDayCheck.disabled = false;
                 startTimeEl.required = false;
@@ -368,7 +415,6 @@
                         break;
 
                     case 'NON_DEDUCTIBLE':
-                        // 범위만 공통 적용, 나머지 기본 동작 유지
                         descriptionEl.required = true
                         break;
 
@@ -382,6 +428,7 @@
             }
 
             leaveTypeEl.addEventListener('change', onLeaveTypeChange);
+
 
             // “수정” 버튼 클릭 핸들러
             modalEditBtn.addEventListener('click', (e) => {
@@ -477,12 +524,32 @@
                     const y = midDate.getFullYear();      // 예: 2025
                     const m = midDate.getMonth() + 1;     // 1~12
 
-                    // GET 요청 → Promise 반환
                     return fetch(`/api/v1/calendar/events/${y}/${m}`)
                         .then(res => {
                             if (!res.ok) throw new Error('네트워크 에러');
-                            return res.json();                // JSON 배열을 반환하는 Promise
-                        });
+                            return res.json();
+                        })
+                        .then(events => {
+                            // events 는 MonthlyEvent DTO 배열이라고 가정
+                            return events.map(evt => ({
+                                id:             evt.id,
+                                title:          evt.title,
+                                start:          evt.start,
+                                end:            evt.end,
+                                allDay:         evt.allDay,
+                                // isHoliday 플래그에 따라 색상 지정
+                                backgroundColor: evt.isHoliday ? '#dc3545' : undefined,
+                                borderColor:     evt.isHoliday ? '#dc3545' : undefined,
+                                textColor:       evt.isHoliday ? '#ffffff' : undefined,
+                            }));
+                            successCallback(fcEvents);
+                        })
+                        .catch(err => {
+                            console.error(err);
+                            showToast('일정을 불러오는 중 오류가 발생했습니다.', 'error');
+                            // 실패 콜백에 빈 배열을 넘겨줘서 캘린더가 비어 있게 함
+                            failureCallback([]);
+                        });;
                 },
 
                 // event 클릭 함수 정의 -> 일정 정보 (수정, 삭제 가능하도록)
@@ -515,6 +582,24 @@
                                 modalDeleteBtn.style.display = 'none';
                             }
 
+                            // 휴일 라벨·정보 토글
+                            const isHoliday = data.isHoliday;
+                            document.getElementById('modalHolidayLabel').style.display = isHoliday ? '' : 'none';
+                            document.getElementById('modalHolidayInfo' ).style.display = isHoliday ? '' : 'none';
+
+                            if (isHoliday) {
+                                let text;
+                                if (data.isAllDay) {
+                                    // DTO의 isAllDay 플래그 활용
+                                    text = '종일';
+                                } else {
+                                    // DTO의 startTime, endTime을 바로 포맷
+                                    const fmt = t => t.padStart(5, '0'); // "9:0" → "09:00"
+                                    text = `${fmt(data.startTime)} ~ ${fmt(data.endTime)}`;
+                                }
+                                document.getElementById('modalHolidayText').textContent = text;
+                            }
+
                             // Bootstrap 모달 표시
                             detailEventModal.show();
                         })
@@ -531,6 +616,13 @@
                         showToast('일정 등록은 로그인 후 가능합니다.', 'warning');
                         return;
                     }
+
+                    // const day = info.date.getDay();
+                    // // 일요일(0) 또는 토요일(6) 이면
+                    // if (day === 0 || day === 6) {
+                    //     showToast('주말은 일정 등록할 수 없습니다.', 'warning');
+                    //     return;
+                    // }
                     // 등록 모드 진입 시 기존 ID 초기화
                     currentEventId = null;
                     // 전역 변수에 클릭한 날짜 저장
@@ -621,6 +713,11 @@
 
                 // 2) allDay 키가 없으면 기본 false 주입 (문자열 → boolean 변환 포함)
                 dataObj.isAllDay = document.getElementById('allDayCheck').checked; // true / false
+
+                // holidayInclude도 boolean값 전달
+                if (typeof holidayIncludeCheck !== 'undefined' && holidayIncludeCheck !== null) {
+                    dataObj.isHolidayInclude = holidayIncludeCheck.checked;
+                }
 
                 // 2) 등록 버튼 비활성화
                 submitBtn.disabled = true;
