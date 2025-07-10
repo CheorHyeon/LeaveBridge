@@ -25,7 +25,9 @@ public record MonthlyEventDetailResponse(
 	@Schema(description = "일정 상세 설명", example = "일정 설명 텍스트")
 	String description,
 	@Schema(description = "일정 수정, 삭제 가능한지 여부", example = "true(수정 가능), false(수정 불가)")
-	Boolean isOwner
+	Boolean isOwner,
+	@Schema(description = "휴일 여부", example = "true (휴일), false(휴일 아님)")
+	Boolean isHoliday
 ) {
 	public static MonthlyEventDetailResponse of(LeaveAndHoliday leaveAndHoliday, Boolean isOwer) {
 		return MonthlyEventDetailResponse.builder()
@@ -37,6 +39,7 @@ public record MonthlyEventDetailResponse(
 			.leaveType(leaveAndHoliday.getLeaveType())
 			.description(leaveAndHoliday.getDescription())
 			.isOwner(isOwer)
+			.isHoliday(leaveAndHoliday.getIsHoliday())
 			.build();
 	}
 }
