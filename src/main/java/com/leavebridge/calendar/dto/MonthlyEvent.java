@@ -1,6 +1,8 @@
 package com.leavebridge.calendar.dto;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 import com.leavebridge.calendar.entity.LeaveAndHoliday;
 
@@ -29,12 +31,25 @@ public record MonthlyEvent(
 	Boolean isHoliday
 ) {
 	public static MonthlyEvent from(LeaveAndHoliday leaveAndHoliday) {
+		LocalDate startDate = leaveAndHoliday.getStartDate();
+		LocalTime startTime = leaveAndHoliday.getStarTime();
+		LocalDate endDate   = leaveAndHoliday.getEndDate();
+		LocalTime endTime   = leaveAndHoliday.getEndTime();
+		boolean allDay      = Boolean.TRUE.equals(leaveAndHoliday.getIsAllDay());
+
+		LocalDateTime start = LocalDateTime.of(startDate, startTime);
+		LocalDateTime end = LocalDateTime.of(endDate, endTime);
+		if (allDay) {
+			// all-day 이벤트는 end 날짜를 exclusive 처리하기 위해 +1일
+			end = LocalDateTime.of(endDate.plusDays(1), LocalTime.MIDNIGHT);
+		}
+
 		return MonthlyEvent.builder()
 			.id(leaveAndHoliday.getId())
 			.title(leaveAndHoliday.getTitle())
-			.start(LocalDateTime.of(leaveAndHoliday.getStartDate(), leaveAndHoliday.getStarTime()))
-			.end(LocalDateTime.of(leaveAndHoliday.getEndDate(), leaveAndHoliday.getEndTime()))
-			.allDay(leaveAndHoliday.getIsAllDay())
+			.start(start)
+			.end(end)
+			.allDay(allDay)
 			.isHoliday(leaveAndHoliday.getIsHoliday())
 			.build();
 	}
