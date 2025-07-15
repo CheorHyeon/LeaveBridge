@@ -29,25 +29,40 @@ public record CreateLeaveRequestDto(
 	Boolean isHolidayInclude
 ) {
 	public CreateLeaveRequestDto {
-		if (!Boolean.TRUE.equals(isAllDay)) {
-			// 08:00~17:00 정확히이면 전일
-			if (LeaveAndHoliday.WORK_START_TIME.equals(startTime) &&
-				LeaveAndHoliday.WORK_END_TIME.equals(endTime)) {
+		// 1) isAllDay == true 이면 기본적으로 하루종일(00:00~23:59:59)로 설정
+		if (Boolean.TRUE.equals(isAllDay)) {
+			// startTime, endTime 이 null 이거나 전부 공백("")로 넘어올 경우 대비
+			if (startTime == null) {
+				startTime = LocalTime.MIDNIGHT;            // 00:00:00
+			}
+			if (endTime == null) {
+				endTime   = LocalTime.of(23, 59, 59);      // 23:59:59
+			}
+
+			// 1‑a) 단, “연차 소진 타입” (isConsumesLeave==true) 은
+			//      전일 연차는 업무시간(08:00~17:00)으로 고정하도록 처리
+			if (leaveType.isConsumesLeave()) {
+				startTime = LeaveAndHoliday.WORK_START_TIME;   // 08:00
+				endTime   = LeaveAndHoliday.WORK_END_TIME;     // 17:00
+			}
+		}
+
+		// 2) !allDay 인 경우, 업무시간 범위로 전일 전환 로직
+		else {
+			// 2-1) 08:00~17:00 정확히 입력되면 전일로 간주
+			if (LeaveAndHoliday.WORK_START_TIME.equals(startTime)
+				&& LeaveAndHoliday.WORK_END_TIME.equals(endTime)) {
 				isAllDay = true;
 			}
 
-			// ★ 시작 ≤ 08:00  &&  종료 ≥ 17:00  → 전일
-			boolean startEarlyEnough = !startTime.isAfter(LeaveAndHoliday.WORK_START_TIME); // ≤
-			boolean endLateEnough   = !endTime.isBefore(LeaveAndHoliday.WORK_END_TIME);     // ≥
-			if (startEarlyEnough && endLateEnough) {
+			// 2-2) 시작 ≤ 08:00 && 종료 ≥ 17:00 && 연차 소진 타입 → 전일
+			// 연차 소진 아닌 일정은 그대로 둘꺼임
+			boolean startEarlyEnough = !startTime.isAfter(LeaveAndHoliday.WORK_START_TIME);
+			boolean endLateEnough   = !endTime.isBefore(LeaveAndHoliday.WORK_END_TIME);
+			if (startEarlyEnough && endLateEnough && leaveType.isConsumesLeave()) {
 				isAllDay = true;
-			}
-
-			// 타입이 전일 전용이면 강제 전일
-			if (leaveType == LeaveType.FULL_DAY_LEAVE ||
-				leaveType == LeaveType.SUMMER_VACATION ||
-				leaveType == LeaveType.PUBLIC_HOLIDAY) {
-				isAllDay = true;
+				startTime = LeaveAndHoliday.WORK_START_TIME;
+				endTime   = LeaveAndHoliday.WORK_END_TIME;
 			}
 		}
 	}
