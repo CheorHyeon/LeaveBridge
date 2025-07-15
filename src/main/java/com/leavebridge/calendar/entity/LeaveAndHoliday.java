@@ -43,8 +43,11 @@ import lombok.ToString;
 @EntityListeners(AuditingEntityListener.class)
 public class LeaveAndHoliday {
 
+	// 상수들 모아두기
 	public static final LocalTime WORK_START_TIME = LocalTime.of(8, 0);
 	public static final LocalTime WORK_END_TIME = LocalTime.of(17, 0);
+	public static final LocalTime LUNCH_START = LocalTime.NOON;        // 12:00
+	public static final LocalTime LUNCH_END = LocalTime.of(13, 0);   // 13:00
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -95,6 +98,12 @@ public class LeaveAndHoliday {
 
 	@Column(name = "IS_HOLIDAY")
 	private Boolean isHoliday;
+
+	@Column(name = "USED_LEAVE_HOURS")
+	private Double usedLeaveHours;  // 차감 연차 시간
+
+	@Column(name = "COMMENT")
+	private String comment;  // 연차 미차감 사유
 
 	public static LeaveAndHoliday of(Event event, Member member, LeaveType leaveType) {
 
@@ -185,5 +194,13 @@ public class LeaveAndHoliday {
 
 	public void updateIsHoliday(Boolean isHoliday) {
 		this.isHoliday = Boolean.TRUE.equals(isHoliday);
+	}
+
+	public void updateUsedLeaveHours(Double usedLeaveHours) {
+		this.usedLeaveHours = usedLeaveHours;
+	}
+
+	public void updateComment(String comment) {
+		this.comment = comment;
 	}
 }
