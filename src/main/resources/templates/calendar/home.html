@@ -13,6 +13,21 @@
             background-color: #f0f8ff;
             cursor: pointer;
         }
+
+        /* dayGrid(월간) 뷰의 all‑day 이벤트 */
+        .fc .fc-daygrid-event {
+            margin-bottom: 4px;    /* 아래쪽 간격 */
+        }
+
+        /* timeGrid(시간) 뷰의 이벤트 컨테이너 */
+        .fc .fc-timegrid-event-harness {
+            margin-bottom: 4px;    /* 아래쪽 간격 */
+        }
+
+        /* 필요하면 좌우 간격도 추가 */
+        .fc .fc-event {
+            margin: 2px 0;         /* 세로 2px 여백 */
+        }
     </style>
 </head>
 <div layout:fragment="content">
@@ -70,7 +85,7 @@
                             한 번에 하나의 연차 타입만 등록 가능합니다. 다른 타입은 별도 등록해 주세요.
                         </div>
                         <div class="form-text fw-bold" sec:authorize="hasRole('ADMIN')" id="holidayNotice" style="display: none;">
-                            휴일 포함 체크시 해당 기간동안 연차 등록이 불가능합니다.
+                            휴일 포함 체크시 기존에 등록된 연차들은 차감 연차 조정되거나 삭제됩니다.
                         </div>
                     </div>
 
@@ -487,7 +502,9 @@
                 aspectRatio: 1.5, // 너비: 높이 비율 1.5:1 (종횡비)
                 eventColor: '#3799d8',  // 기본 일정 배경색 설정 (파란색)
                 eventTextColor: '#ffffff',  // 글자 색상 변경
-                dayMaxEvents: true,  // 하루 최대 이벤트 표시(true 인경우 적절히)
+                dayMaxEvents: false,  // 하루 최대 이벤트 표시(true 인경우 적절히)
+                eventOrder: 'duration, start',  // duration이 긴(다중일) 이벤트 우선 렌더
+                eventDisplay: 'block',        // 이벤트가 블록으로 렌더
                 // moreLinkClick: function (info) {
                 //     alert('더보기 클릭: ' + info.data);
                 //     // 여기서 팝업을 열거나 다른 행동 정의할 수 있음

@@ -3,7 +3,6 @@ package com.leavebridge.member.controller;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 
-import com.leavebridge.member.service.MemberService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,8 +11,6 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 @Slf4j
 public class MemberViewController {
-
-	private final MemberService memberService;
 
 	@GetMapping("/member/login")
 	public String login() {

@@ -34,4 +34,8 @@ public enum LeaveType {
 
 	private final String type;
 	private final boolean isDeductible;  // true면 연차 소진
+
+	public boolean isConsumesLeave() {
+		return this.isDeductible;
+	}
 }
