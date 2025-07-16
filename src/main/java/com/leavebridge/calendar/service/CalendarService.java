@@ -99,7 +99,7 @@ public class CalendarService {
 	 */
 
 	private void handleHolidayRegistration(CreateLeaveRequestDto dto, Member member) throws IOException {
-		if(!member.isAdmin()) {
+		if (!member.isAdmin()) {
 			log.info("비관리자의 휴일 등록 시도 차단 loginId = {}", member.getLoginId());
 			throw new IllegalArgumentException("관리자만 휴일 등록이 가능합니다.");
 		}
@@ -108,8 +108,7 @@ public class CalendarService {
 		Event created;
 		try {
 			created = calendarClient.events().insert(GOOGLE_PERSONAL_CALENDAR_ID, event).execute();
-		}
-		catch (Exception dbEx) {
+		} catch (Exception dbEx) {
 			log.info("일정 등록 실패");
 			throw new IllegalArgumentException("일정 등록 실패");
 		}
@@ -169,8 +168,8 @@ public class CalendarService {
 		// 휴일 범위
 		LocalDate holStartDate = dto.startDate();
 		LocalTime holStartTime = dto.startTime();
-		LocalDate holEndDate   = dto.endDate();
-		LocalTime holEndTime   = dto.endTime();
+		LocalDate holEndDate = dto.endDate();
+		LocalTime holEndTime = dto.endTime();
 
 		// 연차 소진 타입 이벤트 조회
 		List<LeaveAndHoliday> list = leaveAndHolidayRepository.findAllConsumesLeaveByDateRange(
@@ -181,9 +180,9 @@ public class CalendarService {
 
 		for (LeaveAndHoliday leave : list) {
 			LocalDate leaveStartDate = leave.getStartDate();
-			LocalDate leaveEndDate   = leave.getEndDate();
+			LocalDate leaveEndDate = leave.getEndDate();
 			LocalTime leaveStartTime = leave.getStarTime();
-			LocalTime leaveEndTime   = leave.getEndTime();
+			LocalTime leaveEndTime = leave.getEndTime();
 
 			// 각 날짜별로 휴일 범위에 완전 포함되는지 확인
 			boolean fullyCovered = true;
@@ -210,10 +209,10 @@ public class CalendarService {
 				// 부분 보정: 사용일수와 사유 재계산
 				Map<String, Object> info = calcUsedDaysAndGetComment(
 					leave.getStartDate(), leave.getStarTime(),
-					leave.getEndDate(),   leave.getEndTime()
+					leave.getEndDate(), leave.getEndTime()
 				);
-				double usedDays = (double) info.get("usedDays");
-				String reason  = ((String) info.get("comment"));
+				double usedDays = (double)info.get("usedDays");
+				String reason = ((String)info.get("comment"));
 
 				leave.updateUsedLeaveHours(usedDays);
 				leave.updateComment(reason);
@@ -223,8 +222,11 @@ public class CalendarService {
 	}
 
 	private void rollbackCalendar(String eventId) {
-		try { calendarClient.events().delete(GOOGLE_PERSONAL_CALENDAR_ID, eventId).execute(); }
-		catch (Exception ex) { log.error("캘린더 롤백 실패: {}", eventId, ex); }
+		try {
+			calendarClient.events().delete(GOOGLE_PERSONAL_CALENDAR_ID, eventId).execute();
+		} catch (Exception ex) {
+			log.error("캘린더 롤백 실패: {}", eventId, ex);
+		}
 	}
 
 	private void validateLeave(CreateLeaveRequestDto dto) {
@@ -236,7 +238,6 @@ public class CalendarService {
 			throw new IllegalArgumentException("연차 시작일이 휴일일 수 없습니다.");
 	}
 
-
 	private void saveEntity(CreateLeaveRequestDto dto, Member member, String eventId,
 		boolean isHoliday, double usedDays, String comment) {
 		LeaveAndHoliday ent = LeaveAndHoliday.of(dto, member, eventId);
@@ -247,7 +248,6 @@ public class CalendarService {
 		}
 		leaveAndHolidayRepository.saveAndFlush(ent);
 	}
-
 
 	private Event createCalendarEvent(CreateLeaveRequestDto dto) {
 		Event event = new Event().setSummary(dto.title());
@@ -346,19 +346,12 @@ public class CalendarService {
 					.append("[").append(d).append("] 점심시간(12:00~13:00) 60분 제외\n");
 			}
 
-			// 00시 ~ 23:59:59 까지의 일정이면 1일 연차니까 8시간으로 변환
-			// 당일 연차일 경우 중 00시 ~ 23:59:59로 등록된거 있을 수 있기에 처리
-			// TODO : Dto에서 시간 조정하여 지우도록
-			if (minutes >= 480) {
-				minutes = 480;
-			}
-
 			totalMinutes += Math.max(0, minutes);
 		}
 
 		// 8시간 = 480분 → 1일
 		double usedDays = (totalMinutes / 60.0) / 8.0;
-		String reason = !reasonBuilder.isEmpty() ? reasonBuilder.toString() : "";
+		String reason = !reasonBuilder.isEmpty() ? reasonBuilder.toString().trim() : "";
 
 		return Map.of(
 			"usedDays", usedDays,
@@ -395,17 +388,40 @@ public class CalendarService {
 		LeaveAndHoliday leaveAndHoliday = leaveAndHolidayRepository.findById(eventId)
 			.orElseThrow(() -> new IllegalArgumentException("해당 Id를 가진 이벤트가 없습니다."));
 
+		// 1) 수정 가능한 타입인지, 관리자 또는 일정 등록자인지, 연차 시작이 휴일 시작 또는 주말 인지 검증
+		checkHolidayUpdateAllowed(leaveAndHoliday, member);
 		checkOwnerOrAdmin(member, leaveAndHoliday);
+		if (dto.leaveType().isConsumesLeave()) {
+			validateLeaveForPatch(dto);
+		}
 
-		checkHolidayUpdateAllowed(leaveAndHoliday);
+		// 2-1) 일반 <-> 휴일 변경 불가
+		boolean wasHoliday = Boolean.TRUE.equals(leaveAndHoliday.getIsHoliday());
+		boolean nowHoliday = Boolean.TRUE.equals(dto.isHolidayInclude());
+		if (wasHoliday != nowHoliday) {
+			throw new IllegalArgumentException("일반 일정과 휴일 일정은 상호 변경할 수 없습니다. 삭제 후 재등록해주세요.");
+		}
+		// 휴일일때 일정 변경 금지
+		else {
+			// DTO 상의 startDate/startTime, endDate/endTime 이 원본과 다르면 예외
+			if (!dto.startDate().equals(leaveAndHoliday.getStartDate())
+				|| !dto.endDate().equals(leaveAndHoliday.getEndDate())
+				|| !dto.startTime().equals(leaveAndHoliday.getStarTime())
+				|| !dto.endTime().equals(leaveAndHoliday.getEndTime())
+			) {
+				throw new IllegalArgumentException("등록된 휴일 일정은 기간 변경이 불가능합니다. 삭제 후 재등록해주세요.");
+			}
+		}
 
-		// 1) 엔티티 수정
-		leaveAndHoliday.patchEntityByDto(dto);
-		leaveAndHoliday.updateIsHoliday(dto.isHolidayInclude()); // 휴가 포함인지 여부
+		//  2-2) “연차 소진" <-> "연차 미소진" 타입의 일정 변경 불가
+		boolean wasDeductible = leaveAndHoliday.getLeaveType().isConsumesLeave();
+		boolean nowDeductible = dto.leaveType().isConsumesLeave();
+		if (wasDeductible != nowDeductible) {
+			throw new IllegalArgumentException("연차 소진 타입 변경은 지원되지 않습니다. 삭제 후 재등록해 주세요.");
+		}
 
+		// 3) Google Calendar에 등록된 이벤트 정보 조회
 		String googleEventId = leaveAndHoliday.getGoogleEventId();
-
-		// 2) Google 이벤트에서 현재 start/end 정보 조회
 		Event apiEvent;
 		try {
 			apiEvent = calendarClient.events()
@@ -415,22 +431,43 @@ public class CalendarService {
 			throw new IllegalArgumentException("Google 이벤트 조회 실패", e);
 		}
 
-		// 3) 변경 없으면 바로 리턴
-		if (!applyAllChanges(apiEvent, dto)) {
-			return;
+		// 4)  applyAllChanges 에서 API payload에 반영해야 할 변경이 있었는지 저장
+		boolean changed = applyAllChanges(apiEvent, dto);
+
+		// 5-1) 엔티티 기본 정보 수정
+		leaveAndHoliday.patchEntityByDto(dto);
+
+		// 5-2) 연차 사용량 재계산
+		if (leaveAndHoliday.getLeaveType().isConsumesLeave()) {
+			Map<String, Object> info = calcUsedDaysAndGetComment(
+				leaveAndHoliday.getStartDate(), leaveAndHoliday.getStarTime(),
+				leaveAndHoliday.getEndDate(), leaveAndHoliday.getEndTime()
+			);
+
+			double usedDays = (double)info.get("usedDays");
+			String comment = ((String)info.get("comment"));
+
+			if (usedDays == 0.0) {
+				throw new IllegalArgumentException("해당 기간에 휴일/주말만 포함되어 실제 연차 소진이 없게되어 수정할 수 없습니다.");
+			}
+
+			leaveAndHoliday.updateUsedLeaveHours(usedDays);
+			leaveAndHoliday.updateComment(comment);
 		}
 
 		// TODO : 에외 공통화
-		// 4) 변경된 필드가 있으면 PATCH 호출
-		try {
-			calendarClient.events()
-				.patch(GOOGLE_PERSONAL_CALENDAR_ID, googleEventId, apiEvent)
-				.execute();
-		} catch (GoogleJsonResponseException e) {
-			if (e.getStatusCode() == 404) {
-				log.error("업데이트할 이벤트를 찾을 수 없음: googleEventId={}", googleEventId);
+		// 6) PATCH 호출하여 구글 캘린더에도 수정 반영하기
+		if (changed) {
+			try {
+				calendarClient.events()
+					.patch(GOOGLE_PERSONAL_CALENDAR_ID, googleEventId, apiEvent)
+					.execute();
+			} catch (GoogleJsonResponseException e) {
+				if (e.getStatusCode() == 404) {
+					log.error("업데이트할 이벤트를 찾을 수 없음: googleEventId={}", googleEventId);
+				}
+				throw new IllegalArgumentException("이벤트 업데이트 실패", e);
 			}
-			throw new IllegalArgumentException("이벤트 업데이트 실패", e);
 		}
 	}
 
@@ -443,8 +480,7 @@ public class CalendarService {
 			.orElseThrow(() -> new IllegalArgumentException("해당 Id를 가진 이벤트가 없습니다."));
 
 		checkOwnerOrAdmin(member, leaveAndHoliday);
-
-		checkHolidayUpdateAllowed(leaveAndHoliday);
+		checkHolidayUpdateAllowed(leaveAndHoliday, member);
 
 		// 1) DB 삭제 우선
 		leaveAndHolidayRepository.delete(leaveAndHoliday);
@@ -467,10 +503,20 @@ public class CalendarService {
 	/**
 	 * 공휴일 검증
 	 */
-	private void checkHolidayUpdateAllowed(LeaveAndHoliday leaveAndHoliday) {
-		if (leaveAndHoliday.getLeaveType() == LeaveType.PUBLIC_HOLIDAY
-			|| leaveAndHoliday.getLeaveType() == LeaveType.OTHER_PEOPLE) {
-			throw new IllegalArgumentException("공휴일 이벤트와 비회원 이벤트는 조작할 수 없습니다.");
+	private void checkHolidayUpdateAllowed(LeaveAndHoliday leaveAndHoliday, Member member) {
+
+		LeaveType targetLeaveType = leaveAndHoliday.getLeaveType();
+		if (targetLeaveType == LeaveType.OTHER_PEOPLE) {
+			throw new IllegalArgumentException("비회원 이벤트는 관리자도 조작할 수 없습니다.");
+		}
+
+		List<LeaveType> cantModifyingType = List.of(LeaveType.PUBLIC_HOLIDAY, LeaveType.NATIONAL_HOLIDAY,
+			LeaveType.SUNDRY_DAY, LeaveType.TWENTY_FOUR_SOLAR_TERMS, LeaveType.ANNIVERSARY);
+
+		if (cantModifyingType.contains(targetLeaveType)) {
+			if(!member.isAdmin()) {
+				throw new IllegalArgumentException(targetLeaveType.getType() + "은 관리자만 조작할 수 있습니다.");
+			}
 		}
 	}
 
@@ -624,5 +670,14 @@ public class CalendarService {
 		boolean isAdmin = member.isAdmin();
 		boolean isOwer = leaveAndHoliday.isOwnedBy(member);
 		return isOwer || isAdmin;
+	}
+
+	private void validateLeaveForPatch(PatchLeaveRequestDto dto) {
+		LocalDate start = dto.startDate();
+		DayOfWeek dow = start.getDayOfWeek();
+		if (dow == DayOfWeek.SATURDAY || dow == DayOfWeek.SUNDAY)
+			throw new IllegalArgumentException("연차는 주말을 시작일로 사용할 수 없습니다.");
+		if (isHoliday(start))
+			throw new IllegalArgumentException("연차 시작일이 휴일일 수 없습니다.");
 	}
 }
