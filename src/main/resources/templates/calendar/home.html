@@ -16,17 +16,23 @@
 
         /* dayGrid(월간) 뷰의 all‑day 이벤트 */
         .fc .fc-daygrid-event {
-            margin-bottom: 4px;    /* 아래쪽 간격 */
+            margin-bottom: 4px; /* 아래쪽 간격 */
         }
 
         /* timeGrid(시간) 뷰의 이벤트 컨테이너 */
         .fc .fc-timegrid-event-harness {
-            margin-bottom: 4px;    /* 아래쪽 간격 */
+            margin-bottom: 4px; /* 아래쪽 간격 */
         }
 
         /* 필요하면 좌우 간격도 추가 */
         .fc .fc-event {
-            margin: 2px 0;         /* 세로 2px 여백 */
+            margin: 2px 0; /* 세로 2px 여백 */
+        }
+
+        .select-readonly {
+            pointer-events: none;      /* 클릭 불가 */
+            background-color: #e9ecef; /* 입력 불가 느낌 */
+            opacity: 1;                /* 흐려짐 방지 */
         }
     </style>
 </head>
@@ -84,7 +90,8 @@
                         <div class="form-text fw-bold">
                             한 번에 하나의 연차 타입만 등록 가능합니다. 다른 타입은 별도 등록해 주세요.
                         </div>
-                        <div class="form-text fw-bold" sec:authorize="hasRole('ADMIN')" id="holidayNotice" style="display: none;">
+                        <div class="form-text fw-bold" sec:authorize="hasRole('ADMIN')" id="holidayNotice"
+                             style="display: none;">
                             휴일 포함 체크시 기존에 등록된 연차들은 차감 연차 조정되거나 삭제됩니다.
                         </div>
                     </div>
@@ -237,18 +244,26 @@
         /*
             좀 더 친숙한 시간 표현대로 변경하는 함수
          */
-        function formatKoreanDateTime(isoString) {
-            const date = new Date(isoString);
-            const formatter = new Intl.DateTimeFormat('ko-KR', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                hour: 'numeric',
+        function formatKoreanDateTime(dateStr, timeStr) {
+            // ISO 문자열로 합치기
+            // timeStr이 초(sec)까지 포함하지 않을 수도 있어서 pad 보장
+            const normalizedTime = timeStr.length === 5
+                ? `${timeStr}:00`
+                : timeStr;
+            const isoString = `${dateStr}T${normalizedTime}`;
+
+            // Date 객체 생성 (로컬 타임존 기반)
+            const dt = new Date(isoString);
+
+            // Intl.DateTimeFormat 으로 한 번에 포맷
+            return new Intl.DateTimeFormat('ko-KR', {
+                year:   'numeric',
+                month:  'long',
+                day:    'numeric',
+                hour:   'numeric',
                 minute: 'numeric',
                 hour12: true
-            });
-            // 예: "2025년 7월 10일 오후 2:00"
-            return formatter.format(date);
+            }).format(dt);
         }
 
         function onModifyToggleAllDayChange() {
@@ -263,8 +278,8 @@
                 endTime.required = false;
 
                 // 범위·값 모두 제거
-                startTime.value = '';
-                endTime.value = '';
+                startTime.value = '00:00';
+                endTime.value   = '23:59';
                 startTime.removeAttribute('min');
                 startTime.removeAttribute('max');
                 endTime.removeAttribute('min');
@@ -274,6 +289,9 @@
                 timeGroup.style.display = '';
                 startTime.required = true;
                 endTime.required = true;
+
+                startTime.value = '';
+                endTime.value   = '';
             }
         }
 
@@ -300,7 +318,7 @@
             const modalDeleteBtn = document.getElementById('modalDeleteBtn');
             const deleteConfirmModal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
             const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
-            const allDayCheck         = document.getElementById('allDayCheck');
+            const allDayCheck = document.getElementById('allDayCheck');
             const holidayIncludeCheck = document.getElementById('holidayIncludeCheck');
             const holidayIncludeGroup = holidayIncludeCheck?.closest('.form-check');
             const holidayNotice = document.getElementById('holidayNotice');
@@ -308,7 +326,9 @@
             if (holidayIncludeGroup) {
                 holidayIncludeGroup.style.display = 'none';
             }
+
             let currentEventId = null;  // 수정 중인 이벤트 ID 보관
+            let currentIsHoliday = false; // ← 전역 변수로 휴일 여부 저장
 
             allDayCheck.addEventListener('change', onModifyToggleAllDayChange);
 
@@ -331,22 +351,24 @@
 
             let anchorDate = null;         // 폼이 열릴 때 클릭한 날짜 기억
 
-            // 3) leaveType 변경 시 UI 조정
-            function onLeaveTypeChange() {
-                const isHoliday = ['PUBLIC_HOLIDAY','ANNIVERSARY'].includes(leaveTypeEl.value);
-                const currentType = leaveTypeEl.value;
-
-                // holidayIncludeCheck 요소가 실제로 존재할 때만 동작
+            function toggleHolidayIncludeUI(isHoliday) {
                 if (typeof holidayIncludeCheck !== 'undefined' && holidayIncludeCheck !== null) {
                     // 1) 공휴일/기념일일 때만 보이기
                     holidayIncludeGroup.style.display = isHoliday ? '' : 'none';
                     holidayNotice.style.display = isHoliday ? '' : 'none';
 
-                    // 2) 공휴일이 아니면 체크 해제
-                    if (!isHoliday) {
-                        holidayIncludeCheck.checked = false;
-                    }
+                    // 2) 해당 일정이 휴일 여부에 따라 체크(최초 등록때는 안됨, 상세 조회 시에는 체크 여부 변경되게)
+                    holidayIncludeCheck.checked = currentIsHoliday;
                 }
+            }
+
+            // 3) leaveType 변경 시 UI 조정
+            function onLeaveTypeChange() {
+                const isHoliday = ['PUBLIC_HOLIDAY', 'ANNIVERSARY'].includes(leaveTypeEl.value);
+                const currentType = leaveTypeEl.value;
+
+                // holidayIncludeCheck 요소가 실제로 존재할 때만 동작
+                toggleHolidayIncludeUI(isHoliday)
                 // 0) 기본 리셋 (페어된 로직만 남김)
                 allDayCheck.disabled = false;
                 startTimeEl.required = false;
@@ -465,22 +487,57 @@
                 fetch(`/api/v1/calendar/events/${eventId}`)
                     .then(res => res.json())
                     .then(evt => {
+                        // 전역 변수에 isHoliday 저장
+                        currentIsHoliday = evt.isHoliday;
+
                         // 2) 폼 필드에 값 채우기
                         titleInput.value = evt.title;
                         leaveTypeEl.value = evt.leaveType;
-                        startDateEl.value = evt.startDate.slice(0, 10);
-                        endDateEl.value = evt.endDate.slice(0, 10);
+                        startDateEl.value = evt.startDate;
+                        endDateEl.value = evt.endDate;
+                        startTimeEl.value = evt.startTime;
+                        endTimeEl.value   = evt.endTime;
+
                         if (!evt.isAllDay) {
                             allDayCheck.checked = false;
-                            startTimeEl.value = evt.startDate.slice(11, 16);
-                            endTimeEl.value = evt.endDate.slice(11, 16);
+                            startTimeEl.value = evt.startDate;
+                            endTimeEl.value = evt.endDate;
                         } else {
                             allDayCheck.checked = true;
                         }
+                        // holidayIncludeCheck 엘리먼트가 있을 때만 접근
+                        if (holidayIncludeCheck) {
+                            holidayIncludeCheck.checked = Boolean(evt.isHoliday);
+                            // 수정 불가 설정도 함께
+                            holidayIncludeCheck.disabled = currentIsHoliday;
+                        }
                         descriptionEl.value = evt.description || '';
 
-                        // 3) onLeaveTypeChange 등 UI 토글 함수 호출
-                        onLeaveTypeChange();
+                        // isHoliday인 경우 → 수정 불가 필드 비활성화
+                        if (currentIsHoliday) {
+                            // 날짜, 시간, all-day, 휴일 포함 체크박스 전부 비활성화
+                            startDateEl.readOnly = true;
+                            endDateEl.readOnly = true;
+                            allDayCheck.disabled = true;
+                            if (holidayIncludeCheck) holidayIncludeCheck.disabled = true;
+                            startTimeEl.readOnly = true;
+                            endTimeEl.readOnly = true;
+                            leaveTypeEl.disabled = true;
+                            toggleHolidayIncludeUI(currentIsHoliday)
+                            holidayNotice.textContent = '등록된 휴일의 일정을 조절할 수 없습니다. 조절이 필요하면 삭제 후 다시 일정을 생성하세요.';
+                            holidayNotice.style.display = '';  // 보이도록
+                        } else {
+                            // 일반 일정이면 leaveType까지 편집 가능
+                            startDateEl.readOnly = false;
+                            endDateEl.readOnly = false;
+                            allDayCheck.disabled = false;
+                            if (holidayIncludeCheck) holidayIncludeCheck.disabled = false;
+                            startTimeEl.readOnly = false;
+                            endTimeEl.readOnly = false;
+                            leaveTypeEl.disabled = false;
+                            // 3) onLeaveTypeChange 등 UI 토글 함수 호출
+                            onLeaveTypeChange();
+                        }
 
                         formModal.show();
                     })
@@ -549,15 +606,15 @@
                         .then(events => {
                             // events 는 MonthlyEvent DTO 배열이라고 가정
                             return events.map(evt => ({
-                                id:             evt.id,
-                                title:          evt.title,
-                                start:          evt.start,
-                                end:            evt.end,
-                                allDay:         evt.allDay,
+                                id: evt.id,
+                                title: evt.title,
+                                start: evt.start,
+                                end: evt.end,
+                                allDay: evt.allDay,
                                 // isHoliday 플래그에 따라 색상 지정
                                 backgroundColor: evt.isHoliday ? '#dc3545' : undefined,
-                                borderColor:     evt.isHoliday ? '#dc3545' : undefined,
-                                textColor:       evt.isHoliday ? '#ffffff' : undefined,
+                                borderColor: evt.isHoliday ? '#dc3545' : undefined,
+                                textColor: evt.isHoliday ? '#ffffff' : undefined,
                             }));
                             successCallback(fcEvents);
                         })
@@ -566,7 +623,8 @@
                             showToast('일정을 불러오는 중 오류가 발생했습니다.', 'error');
                             // 실패 콜백에 빈 배열을 넘겨줘서 캘린더가 비어 있게 함
                             failureCallback([]);
-                        });;
+                        });
+                    ;
                 },
 
                 // event 클릭 함수 정의 -> 일정 정보 (수정, 삭제 가능하도록)
@@ -582,8 +640,8 @@
                         .then(data => {
                             // 모달 내부 요소에 데이터 채우기
                             document.getElementById('modalTitle').textContent = data.title;
-                            document.getElementById('modalStart').textContent = formatKoreanDateTime(data.startDate);
-                            document.getElementById('modalEnd').textContent = formatKoreanDateTime(data.endDate);
+                            document.getElementById('modalStart').textContent = formatKoreanDateTime(data.startDate, data.startTime);
+                            document.getElementById('modalEnd').textContent = formatKoreanDateTime(data.endDate, data.endTime);
                             document.getElementById('modalDescription').textContent = data.description || '설명 없음';
 
                             // 수정 버튼에 eventId 속성으로 넣기
@@ -602,7 +660,7 @@
                             // 휴일 라벨·정보 토글
                             const isHoliday = data.isHoliday;
                             document.getElementById('modalHolidayLabel').style.display = isHoliday ? '' : 'none';
-                            document.getElementById('modalHolidayInfo' ).style.display = isHoliday ? '' : 'none';
+                            document.getElementById('modalHolidayInfo').style.display = isHoliday ? '' : 'none';
 
                             if (isHoliday) {
                                 let text;
@@ -725,8 +783,16 @@
                     : '/api/v1/calendar/events';
                 const method = currentEventId ? 'PATCH' : 'POST';
 
+                // ① disabled 풀고
+                const disabledEls = eventForm.querySelectorAll('[disabled]');
+                disabledEls.forEach(el => el.disabled = false);
+
+                // ② FormData 뽑기
                 const formData = new FormData(eventForm);
                 const dataObj = Object.fromEntries(formData.entries());
+
+                // ③ 다시 disabled 복귀
+                disabledEls.forEach(el => el.disabled = true);
 
                 // 2) allDay 키가 없으면 기본 false 주입 (문자열 → boolean 변환 포함)
                 dataObj.isAllDay = document.getElementById('allDayCheck').checked; // true / false
