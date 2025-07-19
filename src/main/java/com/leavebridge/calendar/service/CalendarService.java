@@ -9,7 +9,11 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -34,6 +38,7 @@ import com.leavebridge.calendar.repository.LeaveAndHolidayRepository;
 import com.leavebridge.member.entitiy.Member;
 import com.leavebridge.util.DateUtils;
 
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -623,10 +628,23 @@ public class CalendarService {
 		checkOwnerOrAdmin(member, leaveAndHoliday);
 		checkHolidayUpdateAllowed(leaveAndHoliday, member);
 
-		// 1) DB 삭제 우선
-		leaveAndHolidayRepository.delete(leaveAndHoliday);
+		// 만약 삭제 대상이 '휴일'이라면, 그 기간에 걸친 연차(consume leave)들을 미리 조회
+		boolean isDeletingHoliday = Boolean.TRUE.equals(leaveAndHoliday.getIsHoliday());
+		List<LeaveAndHoliday> impactedLeaves = Collections.emptyList();
+		if (isDeletingHoliday) {
+			// 휴일 기간 동안 연차 소모 타입에 해당하는 일정들
+			impactedLeaves = leaveAndHolidayRepository.findAllConsumesLeaveByDateRange(
+				leaveAndHoliday.getStartDate(), leaveAndHoliday.getEndDate(),
+				List.of(LeaveType.FULL_DAY_LEAVE, LeaveType.HALF_DAY_MORNING, LeaveType.HALF_DAY_AFTERNOON,
+					LeaveType.OUTING, LeaveType.SUMMER_VACATION)
+			);
+		}
 
-		// 2) 캘린더 삭제 -> 이미 삭제된거는 DB 삭제만 처리하면 되니까
+		// 3) DB 삭제 우선
+		leaveAndHolidayRepository.delete(leaveAndHoliday);
+		leaveAndHolidayRepository.flush();
+
+		// 4) 구글 캘린더에서도 삭제
 		try {
 			calendarClient.events()
 				// 객체는 아직 살아있기에 꺼내오기 가능
@@ -636,7 +654,25 @@ public class CalendarService {
 			switch (e.getStatusCode()) {
 				case 404 -> log.error("삭제할 이벤트를 찾을 수 없습니다. eventId={}", eventId);
 				case 410 -> log.error("이미 삭제된 이벤트입니다. eventId={}", eventId);
-				default -> throw new RuntimeException("예외 발생으로 삭제 불가", e);
+				default -> throw new RuntimeException("예외 발생, 재시도 해주세요", e);
+			}
+		}
+
+		// 5) 만약 삭제 대상이 휴일이었다면, 영향을 받은 연차들을 재계산
+		if (isDeletingHoliday) {
+			for (LeaveAndHoliday leave : impactedLeaves) {
+				// calcUsedDaysAndGetComment 메서드로 새 연차 사용량과 코멘트 얻기
+				Map<String, Object> recalculated = calcUsedDaysAndGetComment(
+					leave.getStartDate(), leave.getStarTime(),
+					leave.getEndDate(), leave.getEndTime()
+				);
+				double usedDays = (double)recalculated.get("usedDays");
+				String comment = (String)recalculated.get("comment");
+
+				// 연차 정보 업데이트
+				leave.updateUsedLeaveHours(usedDays);
+				leave.updateComment(comment);
+				leaveAndHolidayRepository.save(leave);
 			}
 		}
 	}
@@ -655,7 +691,7 @@ public class CalendarService {
 			LeaveType.SUNDRY_DAY, LeaveType.TWENTY_FOUR_SOLAR_TERMS, LeaveType.ANNIVERSARY);
 
 		if (cantModifyingType.contains(targetLeaveType)) {
-			if(!member.isAdmin()) {
+			if (!member.isAdmin()) {
 				throw new IllegalArgumentException(targetLeaveType.getType() + "은 관리자만 조작할 수 있습니다.");
 			}
 		}
