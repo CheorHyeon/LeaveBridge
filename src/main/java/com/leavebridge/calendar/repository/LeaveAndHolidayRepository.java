@@ -19,8 +19,6 @@ public interface LeaveAndHolidayRepository extends JpaRepository<LeaveAndHoliday
 
 	boolean existsByStartDateAndIsHolidayTrueAndIsAllDayTrue(LocalDate start);
 
-	List<LeaveAndHoliday> findByStartDateAndIsHolidayTrueAndIsAllDayFalse(LocalDate startDate);
-
 	@Query("""
 		   SELECT l FROM LeaveAndHoliday l
 		WHERE (l.isHoliday = false OR l.isHoliday IS NULL)
@@ -33,4 +31,7 @@ public interface LeaveAndHolidayRepository extends JpaRepository<LeaveAndHoliday
 		@Param("holidayEnd")   LocalDate holidayEnd,
 		@Param("consumesLeaveTypes") List<LeaveType> consumesLeaveTypes
 	);
+
+	List<LeaveAndHoliday> findByStartDateLessThanEqualAndEndDateGreaterThanEqualAndIsHolidayTrueAndIsAllDayFalse(
+		LocalDate endDate, LocalDate startDate);
 }

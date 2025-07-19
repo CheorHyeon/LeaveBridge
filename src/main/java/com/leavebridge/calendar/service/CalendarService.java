@@ -9,7 +9,11 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -34,6 +38,7 @@ import com.leavebridge.calendar.repository.LeaveAndHolidayRepository;
 import com.leavebridge.member.entitiy.Member;
 import com.leavebridge.util.DateUtils;
 
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -266,6 +271,117 @@ public class CalendarService {
 		return event;
 	}
 
+	// LeaveAndHoliday에서 LocalDateTime 구간 추출용 DTO
+	@Getter
+	static class DateTimeInterval {
+		private final LocalDateTime start;
+		private final LocalDateTime end;
+
+		public DateTimeInterval(LocalDateTime start, LocalDateTime end) {
+			this.start = start;
+			this.end = end;
+		}
+
+		public boolean isLunchTime() {
+			return start.toLocalTime().equals(LUNCH_START) && end.toLocalTime().equals(LUNCH_END);
+		}
+	}
+
+	/**
+	 * 주어진 부분 휴일들의 겹치는 시간을 합하여 최종적으로 제외할 시간들 리스트 반환 함수
+	 */
+	private List<DateTimeInterval> mergedHolidayTimesWithLunchTime(
+		List<LeaveAndHoliday> partials,
+		LocalDate targetDate
+	) {
+		List<DateTimeInterval> intervals = new ArrayList<>();
+
+		for (LeaveAndHoliday h : partials) {
+			// 1) 이 건이 targetDate를 포함하므로, 날짜 루프 불필요
+			// rawStart: 휴일이 targetDate 이전부터 시작됐다면 근무시작, 아니면 실제 시작시간
+			LocalTime rawStart = h.getStartDate().isBefore(targetDate)
+				? WORK_START_TIME
+				: h.getStarTime();
+			// rawEnd: 휴일이 targetDate 이후까지 이어진다면 근무종료, 아니면 실제 종료시간
+			LocalTime rawEnd = h.getEndDate().isAfter(targetDate)
+				? WORK_END_TIME
+				: h.getEndTime();
+
+			// 2) 근무시간 범위로 클램핑
+			LocalTime startT = rawStart.isBefore(WORK_START_TIME) ? WORK_START_TIME : rawStart;
+			LocalTime endT = rawEnd.isAfter(WORK_END_TIME) ? WORK_END_TIME : rawEnd;
+
+			// 3) 유효 구간이면 (시작 18시, 종료 19시면 안맞게되는 등)
+			if (startT.isBefore(endT)) {
+				boolean overlapsLunch =
+					startT.isBefore(LUNCH_END) && endT.isAfter(LUNCH_START);
+
+				if (overlapsLunch) {
+					// 점심 전 구간
+					if (startT.isBefore(LUNCH_START)) {
+						intervals.add(new DateTimeInterval(
+							LocalDateTime.of(targetDate, startT),
+							LocalDateTime.of(targetDate, LUNCH_START)
+						));
+					}
+					// 점심 후 구간
+					if (endT.isAfter(LUNCH_END)) {
+						intervals.add(new DateTimeInterval(
+							LocalDateTime.of(targetDate, LUNCH_END),
+							LocalDateTime.of(targetDate, endT)
+						));
+					}
+				} else {
+					// 점심과 겹치지 않으면 그대로 추가
+					intervals.add(new DateTimeInterval(
+						LocalDateTime.of(targetDate, startT),
+						LocalDateTime.of(targetDate, endT)
+					));
+				}
+			}
+		}
+
+		// 병합
+		return mergeIntervals(intervals);
+	}
+
+	/**
+	 * 주어진 (시작,종료) 구간들을 겹침 및 연속 포함해서 최대 병합한 리스트로 반환
+	 */
+	public static List<DateTimeInterval> mergeIntervals(List<DateTimeInterval> intervals) {
+		if (intervals.isEmpty()) {
+			return Collections.emptyList();
+		}
+
+		// 1) 시작 시간 기준으로 정렬 (LocalDateTime 비교)
+		intervals.sort(Comparator.comparing(DateTimeInterval::getStart));
+
+		List<DateTimeInterval> merged = new ArrayList<>();
+		// 2) 첫 구간으로 시작
+		DateTimeInterval current = intervals.get(0);
+
+		for (int i = 1; i < intervals.size(); i++) {
+			DateTimeInterval next = intervals.get(i);
+
+			// "겹치거나 연속" (current.end >= next.start)일 때 병합
+			if (!current.getEnd().isBefore(next.getStart())) {
+				// end 시각을 둘 중 더 늦은 쪽으로 연장
+				LocalDateTime newEnd = current.getEnd().isAfter(next.getEnd())
+					? current.getEnd()
+					: next.getEnd();
+				current = new DateTimeInterval(current.getStart(), newEnd);
+			} else {
+				// 틈이 있으면, 지금까지 병합된 current를 결과에 추가하고 next를 새로운 current로
+				merged.add(current);
+				current = next;
+			}
+		}
+		// 마지막 구간 추가
+		merged.add(current);
+
+		return merged;
+	}
+
 	/**
 	 * 실제 연차 사용 “일수” 계산 + 연차 비차감 사유 추출
 	 */
@@ -277,6 +393,35 @@ public class CalendarService {
 
 		double totalMinutes = 0;
 		StringBuilder reasonBuilder = new StringBuilder();
+
+		// 전체 구간(startDate~endDate)에 걸친 “부분 휴일”만 미리 가져온다.
+		List<LeaveAndHoliday> allPartials = leaveAndHolidayRepository
+			.findByStartDateLessThanEqualAndEndDateGreaterThanEqualAndIsHolidayTrueAndIsAllDayFalse(
+				endDate, startDate
+			);
+
+		/**
+		 * 적용 날짜 : [휴일 엔티티] 묶어줌 (여러 일 거친것도 특정일 기준으로 검사할 수 있게)
+		 * h1: 7/13 ~ 7/15, h2: 7/14 ~ 7/14, h3: 7/16 ~ 7/17
+		 * partialsByDate.get(2025-07-13) → [h1]
+		 * partialsByDate.get(2025-07-14) → [h1, h2]
+		 * partialsByDate.get(2025-07-15) → [h1]
+		 * partialsByDate.get(2025-07-16) → [h3]
+		 * partialsByDate.get(2025-07-17) → [h3]
+		 */
+		Map<LocalDate, List<LeaveAndHoliday>> partialsByDate = new HashMap<>();
+		for (LeaveAndHoliday h : allPartials) {
+			LocalDate from = h.getStartDate();
+			LocalDate to = h.getEndDate();
+			for (LocalDate d = from; !d.isAfter(to); d = d.plusDays(1)) {
+				// map에 key d가 없으면 새 리스트 생성
+				if (!partialsByDate.containsKey(d)) {
+					partialsByDate.put(d, new ArrayList<>());
+				}
+				// 해당 날짜 리스트에 h 추가
+				partialsByDate.get(d).add(h);
+			}
+		}
 
 		// 날짜별 루프 (하루 단위 탐색)
 		for (LocalDate d = start.toLocalDate(); !d.isAfter(end.toLocalDate()); d = d.plusDays(1)) {
@@ -290,13 +435,12 @@ public class CalendarService {
 
 			// 2) 전일 휴일 스킵
 			if (isHoliday(d)) {
-				reasonBuilder.append("[").append(d).append("] 전일 휴일 제외\n");
+				reasonBuilder.append("[").append(d).append("] 전일 휴일이 포함된 일정 제외\n");
 				continue;
 			}
 
-			// 3) 부분 휴일 조회
-			List<LeaveAndHoliday> partials = leaveAndHolidayRepository
-				.findByStartDateAndIsHolidayTrueAndIsAllDayFalse(d);
+			// 3) 부분 휴일 조회 - 지금 연차 계산일이 포함된 일정 가져오기
+			List<LeaveAndHoliday> partials = partialsByDate.getOrDefault(d, Collections.emptyList());
 
 			// 4) 해당 날짜의 시작/종료 시각 결정
 			// 시작, 종료일이 아니라면 중간에 낀거니까 이건 1일 연차임이 자명 -> 일 시작, 종료 시간으로 세팅
@@ -308,42 +452,43 @@ public class CalendarService {
 				? end // 이번 반복의 종료일이 매개변수 종료일과 같다면 이 날짜의 연차 끝날로봄
 				: d.atTime(WORK_END_TIME); // 이번 반복이 연차 종료일이 아니라면(중간일 - 당연히 1일 연차니깐 일과 끝나는 시간으로 변경)
 
-			// 5) 점심만 일정 스킵
+			// 5) 점심시간에만 있는 일정 스킵
 			if (isOnlyLunch(dayStart, dayEnd)) {
 				reasonBuilder
 					.append("[").append(d).append("] 점심시간(12:00~13:00) 전부 제외\n");
 				continue;
 			}
 
-			// 6) 기본 분 계산
+			// 6) 해당 일자에 이미 존재하는 휴일들의 시간 중복을 합친 새로운 일정 반환(d 날짜의 점심시간도 항상 포함)
+			List<DateTimeInterval> intervals = mergedHolidayTimesWithLunchTime(partials, d);
+
+			// 7) 기본 분 계산 - 점심시간 포함하면 1시간 제외
 			long minutes = Duration.between(dayStart, dayEnd).toMinutes();
+			if (isLunchIncluded(dayStart.toLocalTime(), dayEnd.toLocalTime())) {
+				minutes -= 60;
+			}
+			long overlapMin = 0;
 
-			// 7) 부분 휴일과 겹치는 분 차감
-			for (LeaveAndHoliday h : partials) {
-				LocalDateTime holStart = LocalDateTime.of(d, h.getStarTime());
-				LocalDateTime holEnd = LocalDateTime.of(d, h.getEndTime());
+			// 8) 부분 휴일과 겹치는 분 차감
+			for (DateTimeInterval interval : intervals) {
+				LocalDateTime holStart = interval.getStart();
+				LocalDateTime holEnd = interval.getEnd();
 
-				// 계산을 위해 요청 구간과 휴일 구간 겹치는 부분
+				// 계산을 위해 요청 구간과 휴일 구간 겹치는 부분(시작점, 종료점) 추출
 				LocalDateTime overlapStart = dayStart.isAfter(holStart) ? dayStart : holStart;
 				LocalDateTime overlapEnd = dayEnd.isBefore(holEnd) ? dayEnd : holEnd;
 
+				// 부분 휴일과 겹치는 부분을 사용한 연차에서 제외
 				if (overlapEnd.isAfter(overlapStart)) {
-					long overlapMin = Duration.between(overlapStart, overlapEnd).toMinutes();
-					minutes -= overlapMin;
-					// 상세 사유: 시간 범위 표시
-					reasonBuilder
-						.append("[").append(d).append("] 부분 휴일 ")
-						.append(holStart.toLocalTime()).append("~")
-						.append(holEnd.toLocalTime())
-						.append(" 중 ").append(overlapMin).append("분 제외\n");
+					overlapMin += Duration.between(overlapStart, overlapEnd).toMinutes();
 				}
 			}
 
-			// 8) 점심시간이 겹치면 60분 차감
-			if (isLunchIncluded(dayStart.toLocalTime(), dayEnd.toLocalTime())) {
-				minutes -= 60;
+			minutes -= overlapMin;
+			if (overlapMin > 0) {
 				reasonBuilder
-					.append("[").append(d).append("] 점심시간(12:00~13:00) 60분 제외\n");
+					.append("[").append(d).append("] 부분 휴일 ")
+					.append(overlapMin).append("분 제외");
 			}
 
 			totalMinutes += Math.max(0, minutes);
@@ -448,7 +593,8 @@ public class CalendarService {
 			String comment = ((String)info.get("comment"));
 
 			if (usedDays == 0.0) {
-				throw new IllegalArgumentException("해당 기간에 휴일/주말만 포함되어 실제 연차 소진이 없게되어 수정할 수 없습니다.");
+				throw new IllegalArgumentException("해당 기간에는 휴일·주말만 포함되어 실제 차감 연차가 없습니다. " +
+												   "변경하시려면 기존 일정을 삭제한 후 다시 등록해주세요.");
 			}
 
 			leaveAndHoliday.updateUsedLeaveHours(usedDays);
@@ -482,10 +628,23 @@ public class CalendarService {
 		checkOwnerOrAdmin(member, leaveAndHoliday);
 		checkHolidayUpdateAllowed(leaveAndHoliday, member);
 
-		// 1) DB 삭제 우선
-		leaveAndHolidayRepository.delete(leaveAndHoliday);
+		// 만약 삭제 대상이 '휴일'이라면, 그 기간에 걸친 연차(consume leave)들을 미리 조회
+		boolean isDeletingHoliday = Boolean.TRUE.equals(leaveAndHoliday.getIsHoliday());
+		List<LeaveAndHoliday> impactedLeaves = Collections.emptyList();
+		if (isDeletingHoliday) {
+			// 휴일 기간 동안 연차 소모 타입에 해당하는 일정들
+			impactedLeaves = leaveAndHolidayRepository.findAllConsumesLeaveByDateRange(
+				leaveAndHoliday.getStartDate(), leaveAndHoliday.getEndDate(),
+				List.of(LeaveType.FULL_DAY_LEAVE, LeaveType.HALF_DAY_MORNING, LeaveType.HALF_DAY_AFTERNOON,
+					LeaveType.OUTING, LeaveType.SUMMER_VACATION)
+			);
+		}
 
-		// 2) 캘린더 삭제 -> 이미 삭제된거는 DB 삭제만 처리하면 되니까
+		// 3) DB 삭제 우선
+		leaveAndHolidayRepository.delete(leaveAndHoliday);
+		leaveAndHolidayRepository.flush();
+
+		// 4) 구글 캘린더에서도 삭제
 		try {
 			calendarClient.events()
 				// 객체는 아직 살아있기에 꺼내오기 가능
@@ -495,7 +654,25 @@ public class CalendarService {
 			switch (e.getStatusCode()) {
 				case 404 -> log.error("삭제할 이벤트를 찾을 수 없습니다. eventId={}", eventId);
 				case 410 -> log.error("이미 삭제된 이벤트입니다. eventId={}", eventId);
-				default -> throw new RuntimeException("예외 발생으로 삭제 불가", e);
+				default -> throw new RuntimeException("예외 발생, 재시도 해주세요", e);
+			}
+		}
+
+		// 5) 만약 삭제 대상이 휴일이었다면, 영향을 받은 연차들을 재계산
+		if (isDeletingHoliday) {
+			for (LeaveAndHoliday leave : impactedLeaves) {
+				// calcUsedDaysAndGetComment 메서드로 새 연차 사용량과 코멘트 얻기
+				Map<String, Object> recalculated = calcUsedDaysAndGetComment(
+					leave.getStartDate(), leave.getStarTime(),
+					leave.getEndDate(), leave.getEndTime()
+				);
+				double usedDays = (double)recalculated.get("usedDays");
+				String comment = (String)recalculated.get("comment");
+
+				// 연차 정보 업데이트
+				leave.updateUsedLeaveHours(usedDays);
+				leave.updateComment(comment);
+				leaveAndHolidayRepository.save(leave);
 			}
 		}
 	}
@@ -514,7 +691,7 @@ public class CalendarService {
 			LeaveType.SUNDRY_DAY, LeaveType.TWENTY_FOUR_SOLAR_TERMS, LeaveType.ANNIVERSARY);
 
 		if (cantModifyingType.contains(targetLeaveType)) {
-			if(!member.isAdmin()) {
+			if (!member.isAdmin()) {
 				throw new IllegalArgumentException(targetLeaveType.getType() + "은 관리자만 조작할 수 있습니다.");
 			}
 		}
