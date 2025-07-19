@@ -30,9 +30,9 @@
         }
 
         .select-readonly {
-            pointer-events: none;      /* 클릭 불가 */
+            pointer-events: none; /* 클릭 불가 */
             background-color: #e9ecef; /* 입력 불가 느낌 */
-            opacity: 1;                /* 흐려짐 방지 */
+            opacity: 1; /* 흐려짐 방지 */
         }
     </style>
 </head>
@@ -114,7 +114,7 @@
                         <div class="col">
                             <label for="inputStartTime" class="form-label">시작 시간</label>
                             <input type="time" class="form-control" id="inputStartTime" name="startTime">
-                            <div class="invalid-feedback">시작 시간은 종료 시간보다 빠를 수 없습니다.</div>
+                            <div class="invalid-feedback">시작 시간은 종료 시간보다 늦을 수 없습니다.</div>
                         </div>
                         <div class="col">
                             <label for="inputEndTime" class="form-label">종료 시간</label>
@@ -257,10 +257,10 @@
 
             // Intl.DateTimeFormat 으로 한 번에 포맷
             return new Intl.DateTimeFormat('ko-KR', {
-                year:   'numeric',
-                month:  'long',
-                day:    'numeric',
-                hour:   'numeric',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: 'numeric',
                 minute: 'numeric',
                 hour12: true
             }).format(dt);
@@ -279,7 +279,7 @@
 
                 // 범위·값 모두 제거
                 startTime.value = '00:00';
-                endTime.value   = '23:59';
+                endTime.value = '23:59';
                 startTime.removeAttribute('min');
                 startTime.removeAttribute('max');
                 endTime.removeAttribute('min');
@@ -291,7 +291,7 @@
                 endTime.required = true;
 
                 startTime.value = '';
-                endTime.value   = '';
+                endTime.value = '';
             }
         }
 
@@ -496,7 +496,7 @@
                         startDateEl.value = evt.startDate;
                         endDateEl.value = evt.endDate;
                         startTimeEl.value = evt.startTime;
-                        endTimeEl.value   = evt.endTime;
+                        endTimeEl.value = evt.endTime;
 
                         if (!evt.isAllDay) {
                             allDayCheck.checked = false;
@@ -718,7 +718,34 @@
                     document.getElementById('inputStartDate').value = info.dateStr;
                     document.getElementById('inputEndDate').value = info.dateStr;
 
-                    // 5) 모달 띄우기
+                    // ❗️ 수정 모드에서 꺼진 속성들 되돌리기
+                    const fieldsToEnable = [
+                        leaveTypeEl,
+                        startDateEl,
+                        endDateEl,
+                        startTimeEl,
+                        endTimeEl,
+                        allDayCheck,
+                        holidayIncludeCheck
+                    ];
+                    fieldsToEnable.forEach(el => {
+                        if (!el) return;
+                        el.disabled = false;
+                        el.readOnly = false;
+                        el.classList.remove('select‑readonly');
+
+                    });
+
+                    // ❗️ currentIsHoliday도 반드시 false로 초기화
+                    currentIsHoliday = false;
+
+                    // (휴일 UI 숨기기)
+                    holidayIncludeGroup.style.display = 'none';
+                    holidayNotice.style.display = 'none';
+
+                    // UI 토글 함수를 한 번 더 호출
+                    onLeaveTypeChange();
+
                     formModal.show();
                 }
 
@@ -767,6 +794,36 @@
                 });
                 return true;
             }
+
+            // 1) 날짜 필드 실시간 유효성
+            [startDateEl, endDateEl].forEach(el => {
+                el.addEventListener('input', () => {
+                    if (startDateEl.value && endDateEl.value && startDateEl.value > endDateEl.value) {
+                        startDateEl.setCustomValidity('invalid-date');
+                        startDateEl.classList.add('is-invalid');
+                    } else {
+                        startDateEl.setCustomValidity('');
+                        startDateEl.classList.remove('is-invalid');
+                        endDateEl.setCustomValidity('');
+                        endDateEl.classList.remove('is-invalid');
+                    }
+                });
+            });
+
+            // 2) 시간 필드 실시간 유효성
+            [startTimeEl, endTimeEl].forEach(el => {
+                el.addEventListener('input', () => {
+                    validateDateTime();  // 내부에서 오류 리셋까지 처리됨
+                });
+            });
+
+            // 3) 모달 열릴 때 남아있는 invalid 초기화
+            eventFormModalEl.addEventListener('shown.bs.modal', () => {
+                [startDateEl, endDateEl, startTimeEl, endTimeEl].forEach(el => {
+                    el.setCustomValidity('');
+                    el.classList.remove('is-invalid');
+                });
+            });
 
             // 폼 제출 이벤트 잡기 - form 태그 안에 button 있으면 제출
             eventForm.addEventListener('submit', function (e) {
