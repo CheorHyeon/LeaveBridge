@@ -3,7 +3,11 @@ package com.leavebridge.member.service;
 import java.util.List;
 import java.util.Objects;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.authentication.logout.LogoutHandler;
+import org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,6 +18,8 @@ import com.leavebridge.member.dto.RequestChangePasswordRequest;
 import com.leavebridge.member.entitiy.Member;
 import com.leavebridge.member.repository.MemberRepository;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -25,6 +31,11 @@ public class MemberService {
 
 	private final MemberRepository memberRepository;
 	private final PasswordEncoder passwordEncoder;
+
+	@Autowired
+	private HttpServletRequest request;
+	@Autowired
+	private HttpServletResponse response;
 
 	/**
 	 * 연차 총 일수 - 만일 나중에 실제 서비스 이용 시 규정 상 지급되는 일수를 개인별로 다르게
@@ -72,17 +83,22 @@ public class MemberService {
 	}
 
 	@Transactional
-	public void changePassword(Member member, RequestChangePasswordRequest request) {
+	public void changePassword(Member member, RequestChangePasswordRequest requestDto) {
 		// 1) 현재 비밀번호 맞는지 확인
-		if (!passwordEncoder.matches(request.currentPassword(), member.getPassword())) {
+		if (!passwordEncoder.matches(requestDto.currentPassword(), member.getPassword())) {
 			throw new IllegalArgumentException("현재 비밀번호가 올바르지 않습니다.");
 		}
 
 		// 2) 새 비밀번호·확인 일치 확인
-		if (!request.newPassword().equals(request.confirmPassword())) {
+		if (!requestDto.newPassword().equals(requestDto.confirmPassword())) {
 			throw new IllegalArgumentException("새 비밀번호와 확인 비밀번호가 일치하지 않습니다.");
 		}
 
-		member.updatePassword(passwordEncoder.encode(request.newPassword()));
+		// 3) 비밀번호 변경 - 준영속 상태 엔티티 불필요하게 영속화 안하게 하기 위한 JPQL 쿼리 사용
+		memberRepository.updatePassword(member.getId(), passwordEncoder.encode(requestDto.newPassword()));
+
+		// 4) 세션 초기화 - SecurityContextLogoutHandler 로 세션/컨텍스트 무효화
+		LogoutHandler logoutHandler = new SecurityContextLogoutHandler();
+		logoutHandler.logout(request, response, SecurityContextHolder.getContext().getAuthentication());
 	}
 }
