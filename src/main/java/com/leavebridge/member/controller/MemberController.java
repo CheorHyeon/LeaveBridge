@@ -39,8 +39,8 @@ public class MemberController {
 	}
 
 	@GetMapping("/{memberId}/used-leaves")
-	public ResponseEntity<MemberUsedLeavesResponseDto> getUsedLeaves(@PathVariable @Schema(description = "사용자 id", example = "3") Long memberId,
-		@RequestParam @Schema(description = "조회할 년도", example = "2025") Integer year, @PageableDefault(size = 20, page = 0) Pageable pageable) {
+	public ResponseEntity<MemberUsedLeavesResponseDto> getUsedLeaves(@PathVariable("memberId") @Schema(description = "사용자 id", example = "3") Long memberId,
+		@RequestParam(name="year") @Schema(description = "조회할 년도", example = "2025") Integer year, @PageableDefault(size = 20, page = 0) Pageable pageable) {
 		return ResponseEntity.ok(memberService.getMemberUsedLeaves(memberId, year, pageable));
 	}
 
