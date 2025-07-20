@@ -12,13 +12,18 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class MemberViewController {
 
-	@GetMapping("/member/login")
+	@GetMapping("/members/login")
 	public String login() {
 		return "member/login";
 	}
 
-	@GetMapping("/member/chaange-password")
+	@GetMapping("/members/me/password")
 	public String changePassword() {
 		return "member/change_password";
+	}
+
+	@GetMapping("/members/leaves/usage")
+	public String membersLeavesUsage() {
+		return "member/leaves_usage";
 	}
 }

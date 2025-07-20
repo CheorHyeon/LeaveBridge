@@ -2,7 +2,6 @@ package com.leavebridge.calendar.service;
 
 import static com.leavebridge.calendar.entity.LeaveAndHoliday.*;
 
-import java.io.IOException;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -17,15 +16,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.util.Data;
 import com.google.api.client.util.DateTime;
-import com.google.api.services.calendar.Calendar;
 import com.google.api.services.calendar.model.Event;
 import com.google.api.services.calendar.model.EventDateTime;
 import com.leavebridge.calendar.dto.CreateLeaveRequestDto;
@@ -47,12 +43,9 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Transactional(readOnly = true)
 public class CalendarService {
-	private final Calendar calendarClient;
 	private static final String DEFAULT_TIME_ZONE = "Asia/Seoul";
 	private final LeaveAndHolidayRepository leaveAndHolidayRepository;
-
-	@Value("${google.calendar-id}")
-	private String GOOGLE_PERSONAL_CALENDAR_ID;
+	private final GoogleCalendarAPIService googleCalendarAPIService;
 
 	/**
 	 * 특정 이벤트의 상세 정보를 조회합니다.
@@ -88,7 +81,7 @@ public class CalendarService {
 	 * 지정된 calendarId에 연차를 등록합니다.
 	 */
 	@Transactional
-	public void createTimedEvent(CreateLeaveRequestDto requestDto, Member member) throws IOException {
+	public void createTimedEvent(CreateLeaveRequestDto requestDto, Member member) {
 		// 휴일인 경우
 		if (Boolean.TRUE.equals(requestDto.isHolidayInclude())) {
 			handleHolidayRegistration(requestDto, member);
@@ -103,37 +96,31 @@ public class CalendarService {
 	 * 휴일 등록 - 등록한 휴일에 기존 일정이 있을경우 삭제 (연차 차감되는 일정들만)
 	 */
 
-	private void handleHolidayRegistration(CreateLeaveRequestDto dto, Member member) throws IOException {
+	private void handleHolidayRegistration(CreateLeaveRequestDto dto, Member member) {
 		if (!member.isAdmin()) {
 			log.info("비관리자의 휴일 등록 시도 차단 loginId = {}", member.getLoginId());
 			throw new IllegalArgumentException("관리자만 휴일 등록이 가능합니다.");
 		}
 		// 1. 캘린더 등록
 		Event event = createCalendarEvent(dto);
-		Event created;
-		try {
-			created = calendarClient.events().insert(GOOGLE_PERSONAL_CALENDAR_ID, event).execute();
-		} catch (Exception dbEx) {
-			log.info("일정 등록 실패");
-			throw new IllegalArgumentException("일정 등록 실패");
-		}
+		Event created = googleCalendarAPIService.createGoogleCalendarEvent(event);
 
-		// 2. DB 저장
 		try {
+			// 2. DB 저장
 			saveEntity(dto, member, created.getId(), dto.isHolidayInclude(), 0.0, null);
+			// 3. 기존 연차 보정
+			adjustOverlappingLeaves(dto);
 		} catch (Exception e) {
-			rollbackCalendar(created.getId());
-			throw e;
+			googleCalendarAPIService.deleteGoogleCalendarEvent(created.getId());
+			throw new RuntimeException("알수없는 예외 발생", e);
 		}
-		// 3. 기존 연차 보정
-		adjustOverlappingLeaves(dto);
 	}
 
 	/**
 	 * 일정 등록 - 일반 일정 등록
 	 * 중간에 휴일있을 경우 사용 시간 계산 제외, 휴일 또는 주말 시작일 불가능
 	 */
-	private void handleLeaveRegistration(CreateLeaveRequestDto requestDto, Member member) throws IOException {
+	private void handleLeaveRegistration(CreateLeaveRequestDto requestDto, Member member) {
 		double usedDays = 0.0;
 		String comment = null;
 
@@ -155,21 +142,19 @@ public class CalendarService {
 
 		// 2) Google Calendar 이벤트 생성 (소진 여부와 무관하게)
 		Event leaveEvent = createCalendarEvent(requestDto);
-		Event createdLeave = calendarClient.events()
-			.insert(GOOGLE_PERSONAL_CALENDAR_ID, leaveEvent)
-			.execute();
+		Event createdLeave = googleCalendarAPIService.createGoogleCalendarEvent(leaveEvent);
 
 		// 3. DB 저장
 		try {
 			// 일반 사용자
 			saveEntity(requestDto, member, createdLeave.getId(), false, usedDays, comment);
 		} catch (Exception e) {
-			rollbackCalendar(createdLeave.getId());
+			googleCalendarAPIService.deleteGoogleCalendarEvent(createdLeave.getId());
 			throw e;
 		}
 	}
 
-	private void adjustOverlappingLeaves(CreateLeaveRequestDto dto) throws IOException {
+	private void adjustOverlappingLeaves(CreateLeaveRequestDto dto) {
 		// 휴일 범위
 		LocalDate holStartDate = dto.startDate();
 		LocalTime holStartTime = dto.startTime();
@@ -209,7 +194,7 @@ public class CalendarService {
 			if (fullyCovered) {
 				// 완전 포함된 연차는 삭제
 				leaveAndHolidayRepository.delete(leave);
-				rollbackCalendar(leave.getGoogleEventId());
+				googleCalendarAPIService.deleteGoogleCalendarEvent(leave.getGoogleEventId());
 			} else {
 				// 부분 보정: 사용일수와 사유 재계산
 				Map<String, Object> info = calcUsedDaysAndGetComment(
@@ -223,14 +208,6 @@ public class CalendarService {
 				leave.updateComment(reason);
 				leaveAndHolidayRepository.saveAndFlush(leave);
 			}
-		}
-	}
-
-	private void rollbackCalendar(String eventId) {
-		try {
-			calendarClient.events().delete(GOOGLE_PERSONAL_CALENDAR_ID, eventId).execute();
-		} catch (Exception ex) {
-			log.error("캘린더 롤백 실패: {}", eventId, ex);
 		}
 	}
 
@@ -280,10 +257,6 @@ public class CalendarService {
 		public DateTimeInterval(LocalDateTime start, LocalDateTime end) {
 			this.start = start;
 			this.end = end;
-		}
-
-		public boolean isLunchTime() {
-			return start.toLocalTime().equals(LUNCH_START) && end.toLocalTime().equals(LUNCH_END);
 		}
 	}
 
@@ -529,7 +502,7 @@ public class CalendarService {
 	 * 기존 이벤트(eventId)를 수정합니다.
 	 */
 	@Transactional
-	public void updateEventDate(Long eventId, PatchLeaveRequestDto dto, Member member) throws IOException {
+	public void updateEventDate(Long eventId, PatchLeaveRequestDto dto, Member member) {
 		LeaveAndHoliday leaveAndHoliday = leaveAndHolidayRepository.findById(eventId)
 			.orElseThrow(() -> new IllegalArgumentException("해당 Id를 가진 이벤트가 없습니다."));
 
@@ -547,7 +520,7 @@ public class CalendarService {
 			throw new IllegalArgumentException("일반 일정과 휴일 일정은 상호 변경할 수 없습니다. 삭제 후 재등록해주세요.");
 		}
 		// 휴일일때 일정 변경 금지
-		else {
+		if(nowHoliday) {
 			// DTO 상의 startDate/startTime, endDate/endTime 이 원본과 다르면 예외
 			if (!dto.startDate().equals(leaveAndHoliday.getStartDate())
 				|| !dto.endDate().equals(leaveAndHoliday.getEndDate())
@@ -567,14 +540,7 @@ public class CalendarService {
 
 		// 3) Google Calendar에 등록된 이벤트 정보 조회
 		String googleEventId = leaveAndHoliday.getGoogleEventId();
-		Event apiEvent;
-		try {
-			apiEvent = calendarClient.events()
-				.get(GOOGLE_PERSONAL_CALENDAR_ID, googleEventId)
-				.execute();
-		} catch (IOException e) {
-			throw new IllegalArgumentException("Google 이벤트 조회 실패", e);
-		}
+		Event apiEvent = googleCalendarAPIService.getGoogleCalendarEventByGoogleEventId(googleEventId);
 
 		// 4)  applyAllChanges 에서 API payload에 반영해야 할 변경이 있었는지 저장
 		boolean changed = applyAllChanges(apiEvent, dto);
@@ -601,19 +567,9 @@ public class CalendarService {
 			leaveAndHoliday.updateComment(comment);
 		}
 
-		// TODO : 에외 공통화
 		// 6) PATCH 호출하여 구글 캘린더에도 수정 반영하기
 		if (changed) {
-			try {
-				calendarClient.events()
-					.patch(GOOGLE_PERSONAL_CALENDAR_ID, googleEventId, apiEvent)
-					.execute();
-			} catch (GoogleJsonResponseException e) {
-				if (e.getStatusCode() == 404) {
-					log.error("업데이트할 이벤트를 찾을 수 없음: googleEventId={}", googleEventId);
-				}
-				throw new IllegalArgumentException("이벤트 업데이트 실패", e);
-			}
+			googleCalendarAPIService.patchGoogleCalendarEventByEventIdAndEvent(googleEventId, apiEvent);
 		}
 	}
 
@@ -621,7 +577,7 @@ public class CalendarService {
 	 * 지정한 이벤트(eventId)를 삭제합니다.
 	 */
 	@Transactional
-	public void deleteEvent(Long eventId, Member member) throws IOException {
+	public void deleteEvent(Long eventId, Member member) {
 		LeaveAndHoliday leaveAndHoliday = leaveAndHolidayRepository.findById(eventId)
 			.orElseThrow(() -> new IllegalArgumentException("해당 Id를 가진 이벤트가 없습니다."));
 
@@ -645,17 +601,8 @@ public class CalendarService {
 		leaveAndHolidayRepository.flush();
 
 		// 4) 구글 캘린더에서도 삭제
-		try {
-			calendarClient.events()
-				// 객체는 아직 살아있기에 꺼내오기 가능
-				.delete(GOOGLE_PERSONAL_CALENDAR_ID, leaveAndHoliday.getGoogleEventId())
-				.execute();
-		} catch (GoogleJsonResponseException e) {
-			switch (e.getStatusCode()) {
-				case 404 -> log.error("삭제할 이벤트를 찾을 수 없습니다. eventId={}", eventId);
-				case 410 -> log.error("이미 삭제된 이벤트입니다. eventId={}", eventId);
-				default -> throw new RuntimeException("예외 발생, 재시도 해주세요", e);
-			}
+		if (StringUtils.hasText(leaveAndHoliday.getGoogleEventId())) {
+			googleCalendarAPIService.deleteGoogleCalendarEvent(leaveAndHoliday.getGoogleEventId());
 		}
 
 		// 5) 만약 삭제 대상이 휴일이었다면, 영향을 받은 연차들을 재계산

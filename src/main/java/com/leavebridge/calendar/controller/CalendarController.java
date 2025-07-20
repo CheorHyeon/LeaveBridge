@@ -1,6 +1,5 @@
 package com.leavebridge.calendar.controller;
 
-import java.io.IOException;
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
@@ -38,7 +37,7 @@ public class CalendarController {
 	 */
 	@GetMapping("/events/{year}/{month}")
 	public ResponseEntity<List<MonthlyEvent>> getUpcomingEvents(@PathVariable("year") Integer year,
-		@PathVariable("month") Integer month) throws Exception {
+		@PathVariable("month") Integer month) {
 		log.info("getUpcomingEvents :: year={}, month={}", year, month);
 		List<MonthlyEvent> events = calendarService.listMonthlyEvents(year, month);
 		return ResponseEntity.ok(events);
@@ -51,7 +50,8 @@ public class CalendarController {
 	public ResponseEntity<MonthlyEventDetailResponse> getEventDetail(@PathVariable("eventId") Long eventId,
 		@AuthenticationPrincipal CustomMemberDetails customMemberDetails) {
 		Member member = (customMemberDetails != null) ? customMemberDetails.getMember() : null;
-		log.info("getEventDetail :: eventId = {}, loginId = {}", eventId, member != null ? member.getLoginId() : "비회원 조회");
+		log.info("getEventDetail :: eventId = {}, loginId = {}", eventId,
+			member != null ? member.getLoginId() : "비회원 조회");
 		return ResponseEntity.ok(calendarService.getEventDetails(eventId, member));
 	}
 
@@ -60,7 +60,7 @@ public class CalendarController {
 	 **/
 	@PostMapping("/events")
 	public ResponseEntity<Void> createHolidays(@RequestBody CreateLeaveRequestDto createLeaveRequestDto,
-		@AuthenticationPrincipal(expression = "member") Member member) throws Exception {
+		@AuthenticationPrincipal(expression = "member") Member member) {
 		log.info("createHolidays :: createLeaveRequestDto = {}, login Member = {}", createLeaveRequestDto,
 			member.getLoginId());
 		calendarService.createTimedEvent(createLeaveRequestDto, member);
@@ -73,7 +73,7 @@ public class CalendarController {
 	@PatchMapping("/events/{eventId}")
 	public ResponseEntity<Void> updateHolidays(@PathVariable("eventId") Long eventId,
 		@RequestBody PatchLeaveRequestDto patchLeaveRequestDto,
-		@AuthenticationPrincipal(expression = "member") Member member) throws IOException {
+		@AuthenticationPrincipal(expression = "member") Member member) {
 		log.info("updateHolidays :: eventId={} patchLeaveRequestDto = {} login Id = {}", eventId, patchLeaveRequestDto,
 			member.getLoginId());
 		calendarService.updateEventDate(eventId, patchLeaveRequestDto, member);
@@ -85,7 +85,7 @@ public class CalendarController {
 	 */
 	@DeleteMapping("/events/{eventId}")
 	public ResponseEntity<Void> deleteHolidays(@PathVariable("eventId") Long eventId,
-		@AuthenticationPrincipal(expression = "member") Member member) throws IOException {
+		@AuthenticationPrincipal(expression = "member") Member member) {
 		log.info("deleteHolidays :: eventId={} member = {}", eventId, member.getLoginId());
 		calendarService.deleteEvent(eventId, member);
 		return ResponseEntity.ok().build();

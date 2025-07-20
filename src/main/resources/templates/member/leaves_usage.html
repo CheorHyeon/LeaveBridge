@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{common/layout}">
+<head>
+    <title>연차 사용 현황</title>
+    <style>
+        /* 사용자 목록: 5열 고정 */
+        #user-list {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 0.5rem;
+            width: 100%;
+        }
+
+        #user-list .user-btn {
+            text-align: center;
+        }
+
+        #user-list .user-btn button {
+            width: 100%;
+            white-space: nowrap;
+        }
+
+        /* 년도 검색 영역 */
+        .year-search-container {
+            background-color: #f8f9fa;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .year-search-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .custom-year-input {
+            display: none;
+        }
+
+        .custom-year-input.show {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* 페이징 네비게이션 (간단 버전) */
+        #page-info {
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        #page-controls button {
+            margin: 0 0.25rem;
+        }
+
+        /* 반응형 그리드 조정 */
+        @media (max-width: 1200px) {
+            #user-list {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            #user-list {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 576px) {
+            #user-list {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+
+<div layout:fragment="content">
+    <h1 class="mb-4">연차 사용 현황</h1>
+
+    <div class="row">
+        <!-- 사용자 목록 (Grid Layout) -->
+        <div class="container-fluid py-4">
+            <h5 class="mb-3">사용자 목록</h5>
+            <div id="user-list">
+                <!-- JS로 채워집니다 -->
+            </div>
+        </div>
+
+        <!-- 상세 테이블 영역 -->
+        <div>
+            <div id="usage-detail" class="card" style="display:none; margin-top:1rem;">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="card-title mb-0">
+                            연차 사용 현황: <span id="selected-user-name"></span>
+                        </h5>
+                        <small class="text-muted">
+                            <strong>조회 년도:</strong> <span id="current-year-display"></span>년
+                        </small>
+                    </div>
+
+                    <!-- 년도 검색 영역 -->
+                    <div class="year-search-container mb-3">
+                        <h6 class="mb-2">조회 년도 변경</h6>
+                        <div class="year-search-controls">
+                            <select id="year-select" class="form-select" style="width: auto;">
+                                <option value="2025">2025년</option>
+                                <option value="2026">2026년</option>
+                                <option value="2027">2027년</option>
+                                <option value="2028">2028년</option>
+                                <option value="2029">2029년</option>
+                                <option value="2030">2030년</option>
+                                <option value="custom">직접입력</option>
+                            </select>
+
+                            <div id="custom-year-input" class="custom-year-input">
+                                <input type="number" id="custom-year" class="form-control" placeholder="년도 입력" style="width: 120px;" min="2020" max="2099">
+                                <button type="button" id="custom-search-btn" class="btn btn-primary">검색</button>
+                            </div>
+
+                            <button type="button" id="year-search-btn" class="btn btn-primary">검색</button>
+                        </div>
+                    </div>
+                    <p class="card-text mb-1">
+                        <strong>총 잔여 연차:</strong> <span id="total-count"></span> 일
+                    </p>
+                    <p class="card-text mb-3">
+                        <strong>총 사용 연차:</strong> <span id="used-days"></span> 일<br>
+                        <strong>총 남은 연차:</strong> <span id="remaining-days"></span> 일
+                    </p>
+
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover align-middle text-center">
+                            <thead class="table-light">
+                            <tr>
+                                <th scope="col">순번</th>
+                                <th scope="col">제목</th>
+                                <th scope="col">설명</th>
+                                <th scope="col">시작</th>
+                                <th scope="col">종료</th>
+                                <th scope="col">사용일수</th>
+                                <th scope="col">타입</th>
+                            </tr>
+                            </thead>
+                            <tbody id="detail-body"></tbody>
+                        </table>
+                    </div>
+
+                    <!-- 간단 페이징 정보 -->
+                    <div id="page-info"></div>
+                    <div id="page-controls">
+                        <button id="prev-page" class="btn btn-outline-secondary btn-sm">이전</button>
+                        <button id="next-page" class="btn btn-outline-secondary btn-sm">다음</button>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let members = [];
+        let currentMemberId = null;
+        let currentYear = new Date().getFullYear();
+        let currentPage = 0;
+        const pageSize = 10;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // 현재 년도로 초기화
+            document.getElementById('year-select').value = currentYear;
+            document.getElementById('current-year-display').textContent = currentYear;
+
+            // 1) 멤버 목록 로드
+            fetch('/api/v1/members')
+                .then(r => r.json())
+                .then(list => {
+                    members = list;
+                    renderMemberList();
+                });
+
+            // 2) 페이징 버튼
+            document.getElementById('prev-page').addEventListener('click', () => {
+                if (currentPage > 0) {
+                    currentPage--;
+                    loadUsage(currentMemberId);
+                }
+            });
+            document.getElementById('next-page').addEventListener('click', () => {
+                // 다음 페이지 존재 여부는 loadUsage에서 체크
+                currentPage++;
+                loadUsage(currentMemberId);
+            });
+
+            // 3) 년도 선택 이벤트
+            document.getElementById('year-select').addEventListener('change', function() {
+                const customInput = document.getElementById('custom-year-input');
+                const yearSearchBtn = document.getElementById('year-search-btn');
+
+                if (this.value === 'custom') {
+                    customInput.classList.add('show');
+                    yearSearchBtn.style.display = 'none';
+                } else {
+                    customInput.classList.remove('show');
+                    yearSearchBtn.style.display = 'inline-block';
+                }
+            });
+
+            // 4) 년도 검색 버튼
+            document.getElementById('year-search-btn').addEventListener('click', () => {
+                const selectedYear = document.getElementById('year-select').value;
+                if (selectedYear !== 'custom') {
+                    searchByYear(parseInt(selectedYear));
+                }
+            });
+
+            // 5) 직접입력 검색 버튼
+            document.getElementById('custom-search-btn').addEventListener('click', () => {
+                const customYear = document.getElementById('custom-year').value;
+
+                // 숫자가 아닌 문자가 포함되어 있는지 검사
+                if (!/^\d+$/.test(customYear)) {
+                    alert('숫자만 입력해주세요');
+                    return;
+                }
+
+                const yearNum = parseInt(customYear);
+                if (customYear && yearNum >= 2020 && yearNum <= 2099) {
+                    searchByYear(yearNum);
+                } else {
+                    alert('올바른 년도를 입력해주세요 (2020-2099)');
+                }
+            });
+
+            // 6) 직접입력 엔터키 처리
+            document.getElementById('custom-year').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    document.getElementById('custom-search-btn').click();
+                }
+            });
+        });
+
+        function searchByYear(year) {
+            currentYear = year;
+            currentPage = 0;
+            document.getElementById('current-year-display').textContent = year;
+
+            if (currentMemberId) {
+                loadUsage(currentMemberId);
+            }
+        }
+
+        function renderMemberList() {
+            const listContainer = document.getElementById('user-list');
+            listContainer.innerHTML = '';
+
+            members.forEach(m => {
+                const div = document.createElement('div');
+                div.className = 'user-btn';
+
+                const btn = document.createElement('button');
+                btn.type        = 'button';
+                btn.className   = 'btn btn-outline-primary w-100 text-truncate';
+                btn.textContent = m.memberName;
+                btn.dataset.id  = m.memberId;
+                btn.addEventListener('click', onMemberClick);
+
+                div.appendChild(btn);
+                listContainer.appendChild(div);
+            });
+        }
+
+        function onMemberClick(e) {
+            // Active 처리
+            document.querySelectorAll('#user-list button.active')
+                .forEach(b => b.classList.remove('active'));
+            e.currentTarget.classList.add('active');
+
+            // 멤버 변경
+            currentMemberId = e.currentTarget.dataset.id;
+            currentPage = 0;
+            document.getElementById('selected-user-name').textContent = e.currentTarget.textContent;
+            loadUsage(currentMemberId);
+        }
+
+        function loadUsage(memberId) {
+            if (!memberId) return;
+            fetch(`/api/v1/members/${memberId}/used-leaves?year=${currentYear}&page=${currentPage}&size=${pageSize}`)
+                .then(r => r.json())
+                .then(dto => {
+                    // 통계
+                    document.getElementById('total-count').textContent    = dto.totalCount;
+                    document.getElementById('used-days').textContent      = dto.totalUsedDays ?? dto.usedDays;
+                    document.getElementById('remaining-days').textContent = dto.remainingDays;
+
+                    // 상세 목록
+                    const tbody = document.getElementById('detail-body');
+                    tbody.innerHTML = '';
+                    dto.leaveDetails.content.forEach((item, idx) => {
+                        const tr = document.createElement('tr');
+                        [
+                            idx + 1 + currentPage * pageSize,
+                            item.title,
+                            item.description,
+                            item.startDate + ' ' + item.startTime,
+                            item.endDate   + ' ' + item.endTime,
+                            item.usedDays,
+                            item.leaveType
+                        ].forEach(text => {
+                            const td = document.createElement('td');
+                            td.textContent = text;
+                            tr.appendChild(td);
+                        });
+                        tbody.appendChild(tr);
+                    });
+
+                    // 페이지 정보 및 버튼 상태 업데이트
+                    const pg = dto.leaveDetails.page;
+                    document.getElementById('page-info').textContent =
+                        `페이지 ${pg.number + 1} / ${pg.totalPages} (전체 ${pg.totalElements}건)`;
+
+                    // 페이징 버튼 활성화/비활성화
+                    const prevBtn = document.getElementById('prev-page');
+                    const nextBtn = document.getElementById('next-page');
+
+                    // 이전 버튼: 첫 페이지가 아닐 때만 활성화
+                    if (pg.number === 0) {
+                        prevBtn.disabled = true;
+                        prevBtn.classList.add('disabled');
+                    } else {
+                        prevBtn.disabled = false;
+                        prevBtn.classList.remove('disabled');
+                    }
+
+                    // 다음 버튼: 마지막 페이지가 아닐 때만 활성화
+                    if (pg.number >= pg.totalPages - 1) {
+                        nextBtn.disabled = true;
+                        nextBtn.classList.add('disabled');
+                    } else {
+                        nextBtn.disabled = false;
+                        nextBtn.classList.remove('disabled');
+                    }
+
+                    // 상세 영역 보이기
+                    document.getElementById('usage-detail').style.display = 'block';
+                });
+        }
+    </script>
+</div>
+</html>

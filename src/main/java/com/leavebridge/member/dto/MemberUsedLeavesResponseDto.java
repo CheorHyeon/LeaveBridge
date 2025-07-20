@@ -1,36 +1,37 @@
 package com.leavebridge.member.dto;
 
-import java.util.List;
-
-import com.leavebridge.member.entitiy.Member;
+import org.springframework.data.web.PagedModel;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Builder
-public record MemberUsedLeavesResponseDto(
+@Getter
+@AllArgsConstructor
+@NoArgsConstructor
+public class MemberUsedLeavesResponseDto {
 	@Schema(description = "member Id", example = "3")
-	Long memberId,
+	Long memberId;
 	@Schema(description = "member 이름", example = "박철현")
-	String memberName,
-	@Schema(description = "총 잔여 연차", example = "12.0")
-	double totalCount,     // 12
+	String memberName;
+	@Schema(description = "총 부여 연차", example = "15.0")
+	double totalCount;
 	@Schema(description = "총 사용 연차", example = "3.5")
-	double usedDays,
+	double totalUsedDays;
 	@Schema(description = "총 남은 연차", example = "3.5")
-	double remainingDays,  // 7.5
+	double remainingDays;
 	@Schema(description = "개인별 연차 사용 현황 목록")
-	List<LeaveDetailDto> leaveDetails
-) {
-	public static MemberUsedLeavesResponseDto of(Member member, double totalCount, double usedDays, double remainingDays,
-		List<LeaveDetailDto> leaveDetails) {
-		return MemberUsedLeavesResponseDto.builder()
-			.memberId(member.getId())
-			.memberName(member.getName())
-			.totalCount(totalCount)
-			.usedDays(usedDays)
-			.remainingDays(remainingDays)
-			.leaveDetails(leaveDetails)
-			.build();
+	PagedModel<LeaveDetailDto> leaveDetails;
+
+	public MemberUsedLeavesResponseDto(Long memberId, String memberName, double totalCount, double totalUsedDays) {
+		this(memberId, memberName, totalCount, totalUsedDays, totalCount - totalUsedDays, null);
 	}
+
+	public void updateLeaveDetails(PagedModel<LeaveDetailDto> leaveDetails) {
+		this.leaveDetails = leaveDetails;
+	}
+
 }

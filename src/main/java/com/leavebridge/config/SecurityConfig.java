@@ -24,7 +24,7 @@ public class SecurityConfig {
 		http
 			.authorizeHttpRequests((authorizeHttpRequests) -> authorizeHttpRequests
 				// .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-				.requestMatchers("/", "/member/login", "/css/**", "/js/**").permitAll()
+				.requestMatchers("/", "/members/login", "/css/**", "/js/**").permitAll()
 				.requestMatchers("/api/*/calendar/events/*/*").permitAll() // 일정 조회
 				.requestMatchers("/member/login").permitAll() // 메인 페이지 누구나 가능
 				.requestMatchers("/usage").permitAll() // 연차 사용 현황 누구나 가능
@@ -33,7 +33,7 @@ public class SecurityConfig {
 			)
 			.logout(
 				logout -> logout
-					.logoutUrl("/member/logout")
+					.logoutUrl("/members/logout")
 					.logoutSuccessUrl("/")
 					.invalidateHttpSession(true)
 					.deleteCookies("JSESSIONID")
@@ -41,7 +41,7 @@ public class SecurityConfig {
 
 			.formLogin(
 				formLogin -> formLogin
-					.loginPage("/member/login")
+					.loginPage("/members/login")
 					.permitAll()
 					.defaultSuccessUrl("/", true)
 			)
