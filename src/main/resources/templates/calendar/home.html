@@ -241,30 +241,6 @@
             return `${year}-${month}-${day}`;  // 템플릿 리터럴로 최종 문자열 조합
         }
 
-        /*
-            좀 더 친숙한 시간 표현대로 변경하는 함수
-         */
-        function formatKoreanDateTime(dateStr, timeStr) {
-            // ISO 문자열로 합치기
-            // timeStr이 초(sec)까지 포함하지 않을 수도 있어서 pad 보장
-            const normalizedTime = timeStr.length === 5
-                ? `${timeStr}:00`
-                : timeStr;
-            const isoString = `${dateStr}T${normalizedTime}`;
-
-            // Date 객체 생성 (로컬 타임존 기반)
-            const dt = new Date(isoString);
-
-            // Intl.DateTimeFormat 으로 한 번에 포맷
-            return new Intl.DateTimeFormat('ko-KR', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                hour: 'numeric',
-                minute: 'numeric',
-                hour12: true
-            }).format(dt);
-        }
 
         function onModifyToggleAllDayChange() {
             const allDayCheck = document.getElementById('allDayCheck');

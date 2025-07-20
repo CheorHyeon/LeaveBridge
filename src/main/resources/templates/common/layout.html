@@ -89,30 +89,62 @@
 <!-- 공통 스크립트 -->
 <script>
 
+    /*
+    좀 더 친숙한 시간 표현대로 변경하는 함수
+ */
+    function formatKoreanDateTime(dateStr, timeStr) {
+        // ISO 문자열로 합치기
+        // timeStr이 초(sec)까지 포함하지 않을 수도 있어서 pad 보장
+        const normalizedTime = timeStr.length === 5
+            ? `${timeStr}:00`
+            : timeStr;
+        const isoString = `${dateStr}T${normalizedTime}`;
+
+        // Date 객체 생성 (로컬 타임존 기반)
+        const dt = new Date(isoString);
+
+        // Intl.DateTimeFormat 으로 한 번에 포맷
+        return new Intl.DateTimeFormat('ko-KR', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: 'numeric',
+            hour12: true
+        }).format(dt);
+    }
+
+
     // fetch 요청 리다이렉트 적용되도록 오버라이드
     (() => {
-        // 원본 fetch 저장
         const _fetch = window.fetch;
-
-        // 전역 fetch 오버라이드
         window.fetch = function(input, init = {}) {
-            // credentials: 'include' 를 기본값으로 추가(쿠키 인증을 위해)
             init.credentials = init.credentials || 'include';
-
             return _fetch(input, init)
                 .then(response => {
-                    // 401 Unauthorized 또는 리다이렉트 감지
+                    // 1) 인증 실패나 리다이렉트
                     if (response.status === 401 || response.redirected) {
-                        // 로그인 페이지로 전체 네비게이션
                         window.location.href = '/members/login';
-                        // 이후 체인 중단
                         return Promise.reject(new Error('Redirecting to login'));
                     }
+
+                    // 2) 400~499 클라이언트 에러
+                    if (response.status >= 400 && response.status < 500) {
+                        response.clone().text().then(text => {
+                            showToast(`요청 오류 (${response.status}): ${text || response.statusText}`, 'error');
+                        });
+                        // 필요에 따라 에러를 던지거나, 응답 객체를 그대로 반환할 수도 있음
+                    }
+                    // 3) 500~599 서버 에러
+                    else if (response.status >= 500) {
+                        showToast(`서버 오류 (${response.status}): 잠시 후 다시 시도해주세요.`, 'error');
+                    }
+
                     return response;
                 })
                 .catch(err => {
-                    // 네트워크 오류 등도 여기서 처리 가능
                     console.error('Global fetch error:', err);
+                    showToast(`네트워크 오류: ${err.message}`, 'error');
                     throw err;
                 });
         };
