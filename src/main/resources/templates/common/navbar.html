@@ -6,12 +6,12 @@
     </button>
     <div class="collapse navbar-collapse" id="navbarSupportedContent">
       <ul class="navbar-nav mb-2 mb-lg-0">
-        <li class="nav-item"><a class="nav-link" th:href="@{/usage}">연차사용현황</a></li>
-        <li class="nav-item"><a class="nav-link" th:href="@{/member/login}" th:if="${#authorization.expression('isAnonymous()')}">로그인</a></li>
+        <li class="nav-item"><a class="nav-link" th:href="@{/members/leaves/usage}">연차사용현황</a></li>
+        <li class="nav-item"><a class="nav-link" th:href="@{/members/login}" th:if="${#authorization.expression('isAnonymous()')}">로그인</a></li>
         <li class="nav-item"><a class="nav-link" href="#" th:if="${#authorization.expression('isAuthenticated()')}" onclick="this.nextElementSibling.submit();">로그아웃</a>
-          <form th:action="@{/member/logout}" th:method="post" hidden></form>
+          <form th:action="@{/members/logout}" th:method="post" hidden></form>
         </li>
-        <li class="nav-item"><a class="nav-link" href="/member/chaange-password" th:if="${#authorization.expression('isAuthenticated()')}">비밀번호 변경</a></li>
+        <li class="nav-item"><a class="nav-link" href="/members/me/password" th:if="${#authorization.expression('isAuthenticated()')}">비밀번호 변경</a></li>
       </ul>
     </div>
   </div>

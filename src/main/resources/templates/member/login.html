@@ -3,7 +3,7 @@
 <div layout:fragment="content">
   <div>
     <h3 class="mb-4 text-center">로그인</h3>
-    <form th:action="@{/member/login}" method="post">
+    <form th:action="@{/members/login}" method="post">
       <!-- 로그인 실패 시 파라미터로 error 전달, 스프링 시큐리티 규칙 -->
       <div th:if="${param.error}">
         <div class="alert alert-danger">
