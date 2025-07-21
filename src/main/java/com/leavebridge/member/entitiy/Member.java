@@ -1,6 +1,7 @@
 package com.leavebridge.member.entitiy;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.data.annotation.CreatedDate;
@@ -50,7 +51,8 @@ public class Member {
 
 	@OneToMany(mappedBy = "member", fetch = FetchType.LAZY)
 	@ToString.Exclude
-	private List<LeaveAndHoliday> leaveAndHolidays;
+	@Builder.Default
+	private List<LeaveAndHoliday> leaveAndHolidays = new ArrayList<>();
 
 	@Column(name = "MEMBER_ROLE")
 	@Enumerated(EnumType.STRING)
