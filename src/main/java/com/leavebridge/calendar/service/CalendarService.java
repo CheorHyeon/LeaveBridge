@@ -65,12 +65,15 @@ public class CalendarService {
 	public List<MonthlyEvent> listMonthlyEvents(int year, int month) {
 		log.info("CalendarService.listMonthlyEvents :: year={}, month={}", year, month);
 
-		LocalDate startDate = LocalDate.of(year, month, 1);
-		LocalDate endDate = startDate.plusMonths(1);  // 다음 달 1일 00:00
+		LocalDate monthStart = LocalDate.of(year, month, 1);
+		LocalDate monthEnd   = monthStart.plusMonths(1).minusDays(1);   // 해당 월의 마지막 날
 
-		// 시작일이 지정한 날짜 이상인 것
-		List<LeaveAndHoliday> currentMonthEvents = leaveAndHolidayRepository.findAllByStartDateGreaterThanEqualAndStartDateLessThan(
-			startDate, endDate);
+		/**
+		 * 일정이 월 말 이전 시작했고 일정이 월초 이후에 끝 -> 6/30 ~ 7/2 같은 일정도 7월에 포함됨
+		 * startDate <= MonthEnd && endDate >= monthStart
+		 */
+		List<LeaveAndHoliday> currentMonthEvents = leaveAndHolidayRepository
+			.findAllByStartDateLessThanEqualAndEndDateGreaterThanEqual(monthEnd, monthStart);
 
 		return currentMonthEvents.stream()
 			.map(MonthlyEvent::from)

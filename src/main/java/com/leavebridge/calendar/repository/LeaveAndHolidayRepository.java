@@ -34,4 +34,5 @@ public interface LeaveAndHolidayRepository extends JpaRepository<LeaveAndHoliday
 
 	List<LeaveAndHoliday> findByStartDateLessThanEqualAndEndDateGreaterThanEqualAndIsHolidayTrueAndIsAllDayFalse(
 		LocalDate endDate, LocalDate startDate);
+	List<LeaveAndHoliday> findAllByStartDateLessThanEqualAndEndDateGreaterThanEqual(LocalDate monthEnd, LocalDate monthStart);
 }
