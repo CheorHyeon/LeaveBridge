@@ -9,7 +9,8 @@ import lombok.RequiredArgsConstructor;
 @Getter
 public enum MemberRole implements GrantedAuthority {
 
-	ROLE_MEMBER("일반 회원"),
+	ROLE_GERMANY("파견직"),
+	ROLE_MEMBER("직원"),
 	ROLE_ADMIN("관리자");
 
 	private final String description;

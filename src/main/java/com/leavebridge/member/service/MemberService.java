@@ -16,7 +16,9 @@ import com.leavebridge.member.dto.FindMemberListReponseDto;
 import com.leavebridge.member.dto.LeaveDetailDto;
 import com.leavebridge.member.dto.MemberUsedLeavesResponseDto;
 import com.leavebridge.member.dto.RequestChangePasswordRequest;
+import com.leavebridge.member.dto.SignupRequestDto;
 import com.leavebridge.member.entitiy.Member;
+import com.leavebridge.member.entitiy.MemberRole;
 import com.leavebridge.member.repository.MemberQueryRepository;
 import com.leavebridge.member.repository.MemberRepository;
 
@@ -86,5 +88,32 @@ public class MemberService {
 		// 4) 세션 초기화 - SecurityContextLogoutHandler 로 세션/컨텍스트 무효화
 		LogoutHandler logoutHandler = new SecurityContextLogoutHandler();
 		logoutHandler.logout(request, response, SecurityContextHolder.getContext().getAuthentication());
+	}
+
+	public void checkMemberName(String loginId) {
+		if (memberRepository.existsByLoginId(loginId)) {
+			throw new IllegalArgumentException("이미 존재하는 Id 입니다.");
+		}
+	}
+
+	@Transactional
+	public void signUpMember(SignupRequestDto requestDto) {
+
+		if(!Boolean.TRUE.equals(requestDto.isUsernameAvailable())) {
+			throw new IllegalArgumentException("아이디 중복확인은 필수입니다.");
+		}
+
+		if(!requestDto.password().equals(requestDto.confirmPassword())) {
+			throw new IllegalArgumentException("비밀번호 확인과, 비밀번호가 일치하지 않습니다.");
+		}
+
+		Member member = Member.builder()
+			.name(requestDto.memberName())
+			.memberRole(MemberRole.ROLE_MEMBER)
+			.loginId(requestDto.loginId())
+			.password(passwordEncoder.encode(requestDto.password()))
+			.build();
+
+		memberRepository.save(member);
 	}
 }
