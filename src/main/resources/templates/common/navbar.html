@@ -11,6 +11,7 @@
         <li class="nav-item"><a class="nav-link" href="#" th:if="${#authorization.expression('isAuthenticated()')}" onclick="this.nextElementSibling.submit();">로그아웃</a>
           <form th:action="@{/members/logout}" th:method="post" hidden></form>
         </li>
+        <li class="nav-item"><a class="nav-link" href="/members/signup" th:if="${#authorization.expression('isAnonymous()')}">회원가입</a></li>
         <li class="nav-item"><a class="nav-link" href="/members/me/password" th:if="${#authorization.expression('isAuthenticated()')}">비밀번호 변경</a></li>
       </ul>
     </div>

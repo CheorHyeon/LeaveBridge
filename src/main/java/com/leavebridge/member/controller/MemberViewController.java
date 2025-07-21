@@ -12,6 +12,11 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class MemberViewController {
 
+	@GetMapping("/members/signup")
+	public String signUp() {
+		return "member/signup";
+	}
+
 	@GetMapping("/members/login")
 	public String login() {
 		return "member/login";
