@@ -7,19 +7,26 @@ import com.leavebridge.calendar.entity.LeaveAndHoliday;
 import com.leavebridge.calendar.enums.LeaveType;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
 
 @Builder
 public record PatchLeaveRequestDto(
-	@Schema(description = "수정 일정 제목", example = "박철현 연차 수정")
+	@Schema(description = "수정 일정 제목", example = "박철현 연차")
+	@NotBlank(message = "일정 제목은 필수입니다")
 	String title,
-	@Schema(description = "수정 하루 종일 일정 여부", example = "true")
+	@Schema(description = "하루 종일 일정 여부", example = "true")
+	@NotNull(message = "하루 종일 여부는 필수입니다")
 	Boolean isAllDay,
-	@Schema(description = "수정 연차 종류", example = "HOLIDAY(공휴일), FULL_DAY_LEAVE(1일 연차), HALF_DAY_MORNING(오전_반차), HALF_DAY_AFTERNOON(오후 반차), OUT_GOING(외출), SUMMER_VACATION(여름 휴가), OTHER_PERSON(비회원 연차), NON_DEDUCTIBLE(공결, 병가, 기타 미소진 연차), MEETING(회의)")
+	@Schema(description = "연차 종류", example = "HOLIDAY(공휴일), FULL_DAY_LEAVE(1일 연차), HALF_DAY_MORNING(오전_반차), HALF_DAY_AFTERNOON(오후 반차), OUT_GOING(외출), SUMMER_VACATION(여름 휴가), OTHER_PERSON(비회원 연차), NON_DEDUCTIBLE(공결, 병가, 기타 미소진 연차), MEETING(회의)")
+	@NotNull(message = "연차 종류는 필수입니다")
 	LeaveType leaveType,
-	@Schema(description = "수정 시작 날짜", example = "2025-07-01")
+	@Schema(description = "시작 날짜", example = "2025-07-01")
+	@NotNull(message = "시작 날짜는 필수입니다")
 	LocalDate startDate,
-	@Schema(description = "수정 종료 날짜", example = "2025-07-01")
+	@Schema(description = "종료 날짜", example = "2025-07-01")
+	@NotNull(message = "종료 날짜는 필수입니다")
 	LocalDate endDate,
 	@Schema(description = "수정 시작 날짜 시간", example = "00:00")
 	LocalTime startTime,
@@ -31,26 +38,12 @@ public record PatchLeaveRequestDto(
 	Boolean isHolidayInclude
 ) {
 	public PatchLeaveRequestDto {
-		if (!Boolean.TRUE.equals(isAllDay)) {
-			// 08:00~17:00 정확히이면 전일
-			if (LeaveAndHoliday.WORK_START_TIME.equals(startTime) &&
-				LeaveAndHoliday.WORK_END_TIME.equals(endTime)) {
-				isAllDay = true;
-			}
+		if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
+			throw new IllegalArgumentException("시작 날짜는 종료 날짜보다 이후일 수 없습니다");
+		}
 
-			// ★ 시작 ≤ 08:00  &&  종료 ≥ 17:00  → 전일
-			boolean startEarlyEnough = !startTime.isAfter(LeaveAndHoliday.WORK_START_TIME); // ≤
-			boolean endLateEnough = !endTime.isBefore(LeaveAndHoliday.WORK_END_TIME);     // ≥
-			if (startEarlyEnough && endLateEnough) {
-				isAllDay = true;
-			}
-
-			// 타입이 전일 전용이면 강제 전일
-			if (leaveType == LeaveType.FULL_DAY_LEAVE ||
-				leaveType == LeaveType.SUMMER_VACATION ||
-				leaveType == LeaveType.PUBLIC_HOLIDAY) {
-				isAllDay = true;
-			}
+		if(startTime != null && endTime != null && !(endTime.isAfter(startTime))) {
+			throw new IllegalArgumentException("종료 시간은 시작 시간보다 늦어야합니다.");
 		}
 	}
 }
