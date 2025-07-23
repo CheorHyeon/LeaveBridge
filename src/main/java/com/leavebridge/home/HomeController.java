@@ -6,6 +6,8 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 
+import com.leavebridge.member.entitiy.MemberRole;
+
 @Controller
 public class HomeController {
 
@@ -14,6 +16,12 @@ public class HomeController {
 		boolean isAuthenticated = authentication != null && authentication.isAuthenticated()
 								  && !(authentication instanceof AnonymousAuthenticationToken);
 		model.addAttribute("isAuthenticated", isAuthenticated);
+
+		boolean isGermany = false;
+		if(isAuthenticated)
+			isGermany = authentication.getAuthorities().contains(MemberRole.ROLE_GERMANY);
+
+		model.addAttribute("isGermany", isGermany);
 		return "calendar/home";
 	}
 }

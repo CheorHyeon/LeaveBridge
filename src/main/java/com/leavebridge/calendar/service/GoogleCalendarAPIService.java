@@ -19,6 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 @Slf4j
 public class GoogleCalendarAPIService {
+	public static final String DEFAULT_TIME_ZONE = "Asia/Seoul";
 	private final Calendar calendarClient;
 
 	@Value("${google.calendar-id}")

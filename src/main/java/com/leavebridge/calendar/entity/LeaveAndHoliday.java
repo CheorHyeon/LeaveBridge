@@ -44,8 +44,12 @@ import lombok.ToString;
 public class LeaveAndHoliday {
 
 	// 상수들 모아두기
-	public static final LocalTime WORK_START_TIME = LocalTime.of(8, 0);
-	public static final LocalTime WORK_END_TIME = LocalTime.of(17, 0);
+	public static final LocalTime WORK_START_TIME_FOR_GERMANY = LocalTime.of(8, 0);
+	public static final LocalTime WORK_END_TIME_FOR_GERMANY = LocalTime.of(17, 0);
+	public static final LocalTime WORK_START_TIME_FOR_MEMBER = LocalTime.of(9, 0);
+	public static final LocalTime WORK_END_TIME_FOR_MEMBER = LocalTime.of(18, 0);
+	public static final LocalTime LUNCH_BOUNDARY_TIME_FOR_GERMANY  = LocalTime.of(13, 0); // 오후연차시작
+	public static final LocalTime LUNCH_BOUNDARY_TIME_FOR_MEMBER  = LocalTime.of(14, 0);
 	public static final LocalTime LUNCH_START = LocalTime.NOON;        // 12:00
 	public static final LocalTime LUNCH_END = LocalTime.of(13, 0);   // 13:00
 
@@ -99,8 +103,8 @@ public class LeaveAndHoliday {
 	@Column(name = "IS_HOLIDAY")
 	private Boolean isHoliday;
 
-	@Column(name = "USED_LEAVE_HOURS")
-	private Double usedLeaveHours;  // 차감 연차 시간
+	@Column(name = "USED_LEAVE_DAYS")
+	private Double usedLeaveDays;  // 차감 연차 시간
 
 	@Column(name = "COMMENT")
 	private String comment;  // 연차 미차감 사유
@@ -197,7 +201,7 @@ public class LeaveAndHoliday {
 	}
 
 	public void updateUsedLeaveHours(Double usedLeaveHours) {
-		this.usedLeaveHours = usedLeaveHours;
+		this.usedLeaveDays = usedLeaveHours;
 	}
 
 	public void updateComment(String comment) {

@@ -14,10 +14,7 @@ import com.leavebridge.calendar.enums.LeaveType;
 @Repository
 public interface LeaveAndHolidayRepository extends JpaRepository<LeaveAndHoliday, Long> {
 	List<LeaveAndHoliday> findAllByGoogleEventIdIn(List<String> eventIds);
-	List<LeaveAndHoliday> findAllByStartDateGreaterThanEqualAndStartDateLessThan(LocalDate start, LocalDate end);
 	List<LeaveAndHoliday> findAllByStartDateBetween(LocalDate yearStart, LocalDate yearEnd);
-
-	boolean existsByStartDateAndIsHolidayTrueAndIsAllDayTrue(LocalDate start);
 
 	@Query("""
 		   SELECT l FROM LeaveAndHoliday l
@@ -34,4 +31,11 @@ public interface LeaveAndHolidayRepository extends JpaRepository<LeaveAndHoliday
 
 	List<LeaveAndHoliday> findByStartDateLessThanEqualAndEndDateGreaterThanEqualAndIsHolidayTrueAndIsAllDayFalse(
 		LocalDate endDate, LocalDate startDate);
+
+	boolean existsByStartDateLessThanEqualAndEndDateGreaterThanEqualAndIsHolidayTrueAndIsAllDayTrueAndLeaveTypeNot(
+		LocalDate date, LocalDate date1, LeaveType leaveType);
+
+	boolean existsByStartDateLessThanEqualAndEndDateGreaterThanEqualAndIsHolidayTrueAndIsAllDayTrue(LocalDate date, LocalDate date1);
+
+	List<LeaveAndHoliday> findAllByStartDateLessThanEqualAndEndDateGreaterThanEqual(LocalDate monthEnd, LocalDate monthStart);
 }

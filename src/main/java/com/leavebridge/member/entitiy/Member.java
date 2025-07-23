@@ -9,11 +9,11 @@ import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.security.core.GrantedAuthority;
 
 import com.leavebridge.calendar.entity.LeaveAndHoliday;
+import com.leavebridge.member.converter.MemberRoleListConverter;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -54,9 +54,11 @@ public class Member {
 	@Builder.Default
 	private List<LeaveAndHoliday> leaveAndHolidays = new ArrayList<>();
 
+	// 콤마 구분 문자열 ↔ List<MemberRole> 변환기 지정
+	@Convert(converter = MemberRoleListConverter.class)
 	@Column(name = "MEMBER_ROLE")
-	@Enumerated(EnumType.STRING)
-	private MemberRole memberRole;
+	@Builder.Default
+	private List<MemberRole> memberRoleList = new ArrayList<>();
 
 	@Column(name = "CREATED_DATE")
 	@CreatedDate
@@ -67,7 +69,7 @@ public class Member {
 	private LocalDateTime updatedDate;
 
 	public List<? extends GrantedAuthority> getGrantedAuthorities() {
-		return List.of(memberRole);
+		return memberRoleList;
 	}
 
 	// 최초 생성 시 updatedDate는 null로
@@ -77,10 +79,10 @@ public class Member {
 	}
 
 	public boolean isAdmin() {
-		return this.memberRole == MemberRole.ROLE_ADMIN;
+		return this.memberRoleList.contains(MemberRole.ROLE_ADMIN);
 	}
 
-	public void updatePassword(String encodedPassword) {
-		this.password = encodedPassword;
+	public boolean isGermany() {
+		return memberRoleList.contains(MemberRole.ROLE_GERMANY);
 	}
 }

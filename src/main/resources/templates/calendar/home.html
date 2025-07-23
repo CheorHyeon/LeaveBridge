@@ -84,8 +84,8 @@
                             <option value="SUMMER_VACATION">여름휴가</option>
                             <option value="NON_DEDUCTIBLE">비차감 휴가(공가)</option>
                             <option value="MEETING">회의</option>
-                            <option sec:authorize="hasRole('ADMIN')" value="PUBLIC_HOLIDAY">공휴일</option>
-                            <option sec:authorize="hasRole('ADMIN')" value="ANNIVERSARY">기념일</option>
+                            <option sec:authorize="hasRole('ADMIN')" value="PUBLIC_HOLIDAY">공휴일(파견직 포함)</option>
+                            <option sec:authorize="hasRole('ADMIN')" value="ANNIVERSARY">기념일(파견직 미포함)</option>
                         </select>
                         <div class="form-text fw-bold">
                             한 번에 하나의 연차 타입만 등록 가능합니다. 다른 타입은 별도 등록해 주세요.
@@ -93,6 +93,7 @@
                         <div class="form-text fw-bold" sec:authorize="hasRole('ADMIN')" id="holidayNotice"
                              style="display: none;">
                             휴일 포함 체크시 기존에 등록된 연차들은 차감 연차 조정되거나 삭제됩니다.
+                            기념일의 경우 파견직에는 적용되지 않는 휴일입니다.
                         </div>
                     </div>
 
@@ -338,97 +339,49 @@
                 }
             }
 
-            // 3) leaveType 변경 시 UI 조정
             function onLeaveTypeChange() {
+                // 권한에 따른 근무 시간 상수 설정
+                const workStartTime     = isGermany ? '08:00' : '09:00';
+                const lunchBoundaryTime = isGermany ? '13:00' : '14:00';
+                const workEndTime       = isGermany ? '17:00' : '18:00';
+
                 const isHoliday = ['PUBLIC_HOLIDAY', 'ANNIVERSARY'].includes(leaveTypeEl.value);
                 const currentType = leaveTypeEl.value;
 
                 // holidayIncludeCheck 요소가 실제로 존재할 때만 동작
-                toggleHolidayIncludeUI(isHoliday)
-                // 0) 기본 리셋 (페어된 로직만 남김)
-                allDayCheck.disabled = false;
-                startTimeEl.required = false;
-                endTimeEl.required = false;
-                allDayCheck.checked = true;
-                timeGroup.style.display = 'none';
-                startDateEl.readOnly = false;
-                endDateEl.readOnly = false;
-                startTimeEl.readOnly = false;
-                endTimeEl.readOnly = false;
-                descriptionEl.required = false;
-                startTimeEl.removeAttribute('min');
-                startTimeEl.removeAttribute('max');
-                endTimeEl.removeAttribute('min');
-                endTimeEl.removeAttribute('max');
+                toggleHolidayIncludeUI(isHoliday);
 
-                // ✅ 반차·외출 3종은 “클릭한 날” 하루로 고정
-                const isHalfOrOuting = ['HALF_DAY_MORNING', 'HALF_DAY_AFTERNOON', 'OUTING']
-                    .includes(currentType);
+                // 기본 리셋
+                resetToDefaults();
+
+                // ✅ 반차·외출 3종은 "클릭한 날" 하루로 고정
+                const isHalfOrOuting = ['HALF_DAY_MORNING', 'HALF_DAY_AFTERNOON', 'OUTING'].includes(currentType);
 
                 if (isHalfOrOuting && anchorDate) {     // dateClick 으로 열린 경우에만
-                    startDateEl.value = anchorDate;
-                    endDateEl.value = anchorDate;
-                    startDateEl.readOnly = true;
-                    endDateEl.readOnly = true;
+                    setFixedDate(anchorDate);
                 }
 
-
-                // 1) 타입별 고유 설정
+                // 타입별 고유 설정
                 switch (currentType) {
-                    case '':
-                        allDayCheck.checked = true;
-                        startTimeEl.required = false;
-                        endTimeEl.required = false;
-                        return;
-
                     case 'FULL_DAY_LEAVE':
                     case 'SUMMER_VACATION':
-                        allDayCheck.checked = true;
-                        allDayCheck.disabled = true;
-                        startTimeEl.value = '00:00';
-                        endTimeEl.value = '23:59';
-                        startDateEl.readOnly = false;
-                        endDateEl.readOnly = false;
+                        setAllDayMode(true, '00:00', '23:59');
                         break;
 
                     case 'HALF_DAY_MORNING':
-                        allDayCheck.checked = false;
-                        allDayCheck.disabled = true;
-                        timeGroup.style.display = '';
-                        startTimeEl.value = '08:00';
-                        endTimeEl.value = '13:00';
-                        startDateEl.readOnly = true;
-                        endDateEl.readOnly = true;
-                        startTimeEl.readOnly = true;
-                        endTimeEl.readOnly = true;
+                        setTimeBasedMode(workStartTime, lunchBoundaryTime, true);
                         return;  // 범위 세팅도 필요 없으니 리턴
 
                     case 'HALF_DAY_AFTERNOON':
-                        allDayCheck.checked = false;
-                        allDayCheck.disabled = true;
-                        timeGroup.style.display = '';
-                        startTimeEl.value = '13:00';
-                        endTimeEl.value = '17:00';
-                        startDateEl.readOnly = true;
-                        endDateEl.readOnly = true;
-                        startTimeEl.readOnly = true;
-                        endTimeEl.readOnly = true;
+                        setTimeBasedMode(lunchBoundaryTime, workEndTime, true);
                         return;
 
                     case 'OUTING':
-                        allDayCheck.checked = false;
-                        allDayCheck.disabled = true;
-                        timeGroup.style.display = '';
-                        startDateEl.readOnly = true;
-                        endDateEl.readOnly = true;
-                        startTimeEl.min = '08:00';
-                        startTimeEl.max = '17:00';
-                        endTimeEl.min = '08:00';
-                        endTimeEl.max = '17:00';
+                        setTimeBasedMode(null, null, false, workStartTime, workEndTime);
                         break;
 
                     case 'NON_DEDUCTIBLE':
-                        descriptionEl.required = true
+                        descriptionEl.required = true;
                         break;
 
                     case 'MEETING':
@@ -437,7 +390,60 @@
                     default:
                         break;
                 }
+            }
 
+            function resetToDefaults() {
+                allDayCheck.disabled = false;
+                allDayCheck.checked = true;
+                startTimeEl.required = false;
+                endTimeEl.required = false;
+                timeGroup.style.display = 'none';
+                startDateEl.readOnly = false;
+                endDateEl.readOnly = false;
+                startTimeEl.readOnly = false;
+                endTimeEl.readOnly = false;
+                descriptionEl.required = false;
+
+                // 시간 제한 초기화
+                startTimeEl.min = '';
+                startTimeEl.max = '';
+                endTimeEl.min = '';
+                endTimeEl.max = '';
+            }
+
+            function setFixedDate(date) {
+                startDateEl.value = date;
+                endDateEl.value = date;
+                startDateEl.readOnly = true;
+                endDateEl.readOnly = true;
+            }
+
+            function setAllDayMode(disabled, startTime, endTime) {
+                allDayCheck.checked = true;
+                allDayCheck.disabled = disabled;
+                if (startTime) startTimeEl.value = startTime;
+                if (endTime) endTimeEl.value = endTime;
+            }
+
+            function setTimeBasedMode(startTime, endTime, readOnlyTime, minTime, maxTime) {
+                allDayCheck.checked = false;
+                allDayCheck.disabled = true;
+                timeGroup.style.display = '';
+
+                if (startTime) startTimeEl.value = startTime;
+                if (endTime) endTimeEl.value = endTime;
+
+                if (readOnlyTime) {
+                    startTimeEl.readOnly = true;
+                    endTimeEl.readOnly = true;
+                }
+
+                if (minTime && maxTime) {
+                    startTimeEl.min = minTime;
+                    startTimeEl.max = maxTime;
+                    endTimeEl.min = minTime;
+                    endTimeEl.max = maxTime;
+                }
             }
 
             leaveTypeEl.addEventListener('change', onLeaveTypeChange);
@@ -716,8 +722,10 @@
                     currentIsHoliday = false;
 
                     // (휴일 UI 숨기기)
-                    holidayIncludeGroup.style.display = 'none';
-                    holidayNotice.style.display = 'none';
+                    if(holidayIncludeGroup) {
+                        holidayIncludeGroup.style.display = 'none';
+                        holidayNotice.style.display = 'none';
+                    }
 
                     // UI 토글 함수를 한 번 더 호출
                     onLeaveTypeChange();

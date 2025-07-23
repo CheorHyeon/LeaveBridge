@@ -109,7 +109,7 @@ public class MemberService {
 
 		Member member = Member.builder()
 			.name(requestDto.memberName())
-			.memberRole(MemberRole.ROLE_MEMBER)
+			.memberRoleList(List.of(MemberRole.ROLE_MEMBER))
 			.loginId(requestDto.loginId())
 			.password(passwordEncoder.encode(requestDto.password()))
 			.build();
