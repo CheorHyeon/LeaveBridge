@@ -36,7 +36,7 @@ public class MemberQueryRepository {
 				Expressions.constant(targetMember.getId()),
 				Expressions.constant(targetMember.getName()),
 				Expressions.constant(15.0),
-				leaveAndHoliday.usedLeaveHours.sum()
+				leaveAndHoliday.usedLeaveDays.sum()
 			))
 			.from(leaveAndHoliday)
 			.where(
@@ -59,7 +59,7 @@ public class MemberQueryRepository {
 				leaveAndHoliday.starTime,
 				leaveAndHoliday.endDate,
 				leaveAndHoliday.endTime,
-				leaveAndHoliday.usedLeaveHours,
+				leaveAndHoliday.usedLeaveDays,
 				leaveAndHoliday.comment,
 				leaveAndHoliday.leaveType
 			))
