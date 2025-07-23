@@ -2,6 +2,7 @@
 <html lang="ko"
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout">
 <head>
+    <link rel="icon" href="data:;base64,=">
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <!-- CSRF 메타태그를 실제 값으로 렌더링 -->
@@ -56,6 +57,7 @@
     <script th:inline="javascript">
         /*<![CDATA[*/
         window.isAuthenticated = /*[[${isAuthenticated}]]*/ false;
+        window.isGermany = /*[[${isGermany}]]*/ false;
         /*]]>*/
     </script>
 
