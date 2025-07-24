@@ -98,6 +98,7 @@ public class ExternalEventSyncService {
 		// 4) 변환, 필터, 저장엔티티 지정
 		fetchAllKindsEventThisYear.forEach((leaveType, resp) -> {
 			resp.response().body().items().item().stream()
+				.filter(i -> "Y".equalsIgnoreCase(i.isHoliday())) // 휴일만 가져오기
 				// 여기선 DTO인 item까지 유지해서 isHoliday 값을 가져올 수 있게 한다
 				.map(item -> {
 					LocalDate date = transLocdateToLocalDate(item);
