@@ -43,6 +43,7 @@ public class MemberController {
 
 	@PostMapping("/signup")
 	public ResponseEntity<Void> signupMember(@RequestBody SignupRequestDto requestDto) {
+		log.info("MemberController :: signupMember request Id : {}, name : {} ", requestDto.loginId(), requestDto.memberName());
 		memberService.signUpMember(requestDto);
 		return ResponseEntity.ok().build();
 	}
