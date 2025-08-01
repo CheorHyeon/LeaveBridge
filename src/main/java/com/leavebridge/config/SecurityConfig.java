@@ -26,6 +26,7 @@ public class SecurityConfig {
 				// .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
 				.requestMatchers("/", "/members/login", "/css/**", "/js/**").permitAll()
 				.requestMatchers("/api/*/calendar/events/*/*").permitAll() // 일정 조회
+				.requestMatchers("/health").permitAll() // 헬스 체크 열어두기
 				.requestMatchers("/members/login").permitAll() // 메인 페이지 누구나 가능
 				.requestMatchers("/members/signup", "/api/*/members/signup").permitAll() // 회원가입 누구나 가능
 				.requestMatchers("/usage").permitAll() // 연차 사용 현황 누구나 가능
