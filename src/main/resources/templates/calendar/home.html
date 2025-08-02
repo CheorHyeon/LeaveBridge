@@ -380,11 +380,18 @@
                         setTimeBasedMode(null, null, false, workStartTime, workEndTime);
                         break;
 
+                    /* ④ 공가·회의·공휴일·기념일 → 시간 선택창 표시 */
                     case 'NON_DEDUCTIBLE':
-                        descriptionEl.required = true;
-                        break;
-
                     case 'MEETING':
+                    case 'PUBLIC_HOLIDAY':
+                    case 'ANNIVERSARY':
+                        /* 필요하면 기본 근무시간 제한(09-18시 등) 설정 */
+                        setTimeBasedMode(null, null, false, workStartTime, workEndTime);
+
+                        /* 공가만 비고 필수 */
+                        if (currentType === 'NON_DEDUCTIBLE') {
+                            descriptionEl.required = true;
+                        }
                         break;
 
                     default:
@@ -465,10 +472,21 @@
                 submitBtn.textContent = '수정하기';
                 cancelBtn.textContent = '수정취소'
 
-
+                console.log('=== 5. 본문에서 fetch 호출 시작 ===');
                 fetch(`/api/v1/calendar/events/${eventId}`)
-                    .then(res => res.json())
+                    .then(res => {
+                        if (res.status === 401) {
+                            // 이미 리다이렉트 처리됨, 조용히 종료
+                            return null;
+                        }
+                        if (!res.ok) {
+                            throw new Error(`HTTP ${res.status}`);
+                        }
+                        return res.json();
+                    })
                     .then(evt => {
+                        console.log('=== 7. 데이터 처리 ===', evt);
+                        if (!evt) return;            // 에러 응답이거나 null인 경우 안전 탈출
                         // 전역 변수에 isHoliday 저장
                         currentIsHoliday = evt.isHoliday;
 
@@ -523,7 +541,9 @@
 
                         formModal.show();
                     })
-                    .catch(console.error);
+                    .catch(err => {
+                        console.error('Fetch error:', err);
+                    });
             });
 
             // 4) FullCalendar 초기화

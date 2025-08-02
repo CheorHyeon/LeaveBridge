@@ -37,10 +37,10 @@ public class CalendarScheduler {
 	@Value("${google.calendar-id}")
 	private String GOOGLE_PERSONAL_CALENDAR_ID;
 
-	public static Member adminMember = Member.builder().id(4L).build();
+	public static Member adminMember = Member.builder().id(9999L).build();
 
 	// @Scheduled(cron = "0 */1 * * * *") //1분마다 적용 확인을 위해 일단 달아둠
-	@Scheduled(cron = "0 0 0 * * *")
+	// @Scheduled(cron = "0 0 0 * * *")
 	@Retryable(value = Exception.class, maxAttempts = 3, backoff = @Backoff(delay = 2000))
 	public void getLeaveSchduleRegularly() throws IOException {
 
