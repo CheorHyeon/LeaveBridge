@@ -10,6 +10,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
+import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
 @Configuration
 @EnableWebSecurity
@@ -53,13 +55,17 @@ public class SecurityConfig {
 					.defaultSuccessUrl("/", true)
 			)
 
-			// 인증 안된 경우 401로 통일
+			// 인증 안된 경우
 			.exceptionHandling(ex -> ex
-				.authenticationEntryPoint(
-					new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)
-				)
+				/* 1) API → 401 */
+				.defaultAuthenticationEntryPointFor(
+					new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED),
+					new AntPathRequestMatcher("/api/**"))
+				/* 2) 그 밖의 요청 → 302 */
+				.defaultAuthenticationEntryPointFor(
+					new LoginUrlAuthenticationEntryPoint("/members/login"),
+					new AntPathRequestMatcher("/**"))
 			);
-		;
 		return http.build();
 	}
 }
