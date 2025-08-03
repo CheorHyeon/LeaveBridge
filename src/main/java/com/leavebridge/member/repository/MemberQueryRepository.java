@@ -1,6 +1,7 @@
 package com.leavebridge.member.repository;
 
 import static com.leavebridge.calendar.entity.QLeaveAndHoliday.*;
+import static com.leavebridge.member.entitiy.Member.*;
 import static com.leavebridge.member.entitiy.QMember.*;
 
 import java.util.List;
@@ -90,9 +91,7 @@ public class MemberQueryRepository {
 				member.id,
 				member.name))
 			.from(member)
-			.where(
-				member.id.ne(4L)
-			)
+			.where(member.id.ne(ADMIN_ID))
 			.fetch();
 	}
 }

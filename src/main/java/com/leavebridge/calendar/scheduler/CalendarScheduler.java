@@ -1,5 +1,7 @@
 package com.leavebridge.calendar.scheduler;
 
+import static com.leavebridge.member.entitiy.Member.*;
+
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -37,7 +39,7 @@ public class CalendarScheduler {
 	@Value("${google.calendar-id}")
 	private String GOOGLE_PERSONAL_CALENDAR_ID;
 
-	public static Member adminMember = Member.builder().id(9999L).build();
+	public static Member adminMember = Member.builder().id(ADMIN_ID).build();
 
 	// @Scheduled(cron = "0 */1 * * * *") //1분마다 적용 확인을 위해 일단 달아둠
 	// @Scheduled(cron = "0 0 0 * * *")
