@@ -37,6 +37,8 @@ import lombok.ToString;
 @Table(name = "MEMBER")
 @EntityListeners(AuditingEntityListener.class)
 public class Member {
+	public static final Long ADMIN_ID = 9999L;
+
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	@Column(name = "ID")
