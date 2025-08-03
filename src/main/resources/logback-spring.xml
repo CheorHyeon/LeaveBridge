@@ -5,11 +5,15 @@
     <property name="LOG_DIR" value="${LOG_DIR:-./logs}"/>
     <property name="PATTERN"
               value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"/>
+    <property name="COLOR_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} %highlight([%thread]) %-5level %cyan(%logger{36}) - %msg%n"/>
 
     <!-- 콘솔 출력 -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>${PATTERN}</pattern>
+            <!-- Boot 기본 색상 변환기를 그대로 사용 -->
+            <pattern>${COLOR_PATTERN}</pattern>
+            <charset>UTF-8</charset>
         </encoder>
     </appender>
 
