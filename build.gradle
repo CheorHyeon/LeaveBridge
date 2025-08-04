@@ -101,8 +101,8 @@ dependencies {
     // Validator
     implementation 'org.springframework.boot:spring-boot-starter-validation'
 
-    // JSch : SSH tunneling 자동 열기
-    implementation("com.jcraft:jsch:0.1.55")
+    // apache.sshd
+    implementation 'org.apache.sshd:sshd-core:2.7.0'
 }
 
 tasks.named('test') {
