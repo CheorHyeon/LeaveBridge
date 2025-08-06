@@ -26,6 +26,7 @@ public class SecurityConfig {
 	@Bean
 	SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 		http
+			.cors(cors -> cors.disable())
 			.authorizeHttpRequests((authorizeHttpRequests) -> authorizeHttpRequests
 				// .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
 				.requestMatchers("/", "/members/login", "/css/**", "/js/**").permitAll()
