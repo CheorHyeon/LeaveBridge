@@ -1,0 +1,15 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: spring.datasource.url=jdbc:mysql://<RDS 엔드포인트>:3306/{db명}
+    username: {rds_username}
+    password: {rds_password}
+  jpa:
+    hibernate:
+      ddl-auto: none
+
+# 오버라이드 되서 실제 prod 프로필에선 실제 구글 캘린더 이용됨
+# google:
+  # calendar-id : {google_calendar_Id_in_prod}
