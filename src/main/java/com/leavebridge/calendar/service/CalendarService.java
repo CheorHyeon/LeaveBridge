@@ -226,8 +226,9 @@ public class CalendarService {
 		leaveAndHolidayRepository.delete(leaveAndHoliday);
 		leaveAndHolidayRepository.flush();
 
-		// 3) (파견직 & googleEventId 유효할 때만) 구글 캘린더에서도 삭제
-		if (isGermany && StringUtils.hasText(googleEventId)) {
+		// 3) ((파견직 또는 관리자) & googleEventId 유효할 때만) 구글 캘린더에서도 삭제
+		// 관리자도 구글 캘린더 삭제 가능하도록 수정
+		if ((isGermany || member.isAdmin())&& StringUtils.hasText(googleEventId)) {
 			googleCalendarAPIService.deleteGoogleCalendarEvent(googleEventId);
 		}
 

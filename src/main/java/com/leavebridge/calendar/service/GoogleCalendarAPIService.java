@@ -54,13 +54,22 @@ public class GoogleCalendarAPIService {
 
 	public void deleteGoogleCalendarEvent(String eventId) {
 		// 람다에서 null을 반환
-		withGoogleCall(
-			() -> {
-				calendarClient.events().delete(CALENDAR_ID, eventId).execute();
-				return null;
-			},
-			HttpStatus.NOT_FOUND
-		);
+		try {
+			withGoogleCall(
+				() -> {
+					calendarClient.events().delete(CALENDAR_ID, eventId).execute();
+					return null;
+				},
+				HttpStatus.NOT_FOUND
+			);
+		} catch (ResponseStatusException e) {
+			int status = e.getStatusCode().value();
+			if (status == 404 || status == 410) {
+				log.info("이미 삭제된 이벤트로 판단, DB만 정리: eventId={}", eventId);
+				return; // idempotent 성공 처리
+			}
+			throw e; // 나머지는 그대로 던짐
+		}
 	}
 
 	// ─── 공통 예외 처리 헬퍼 ──────────────────────────────────────────────────────
@@ -78,6 +87,7 @@ public class GoogleCalendarAPIService {
 				case 403 -> "Google Calendar API 한도 초과 등, 관리자에게 문의하세요";
 				case 404 -> "이미 삭제되었거나 리소스를 찾을 수 없습니다.";
 				case 409 -> "리소스 충돌이 발생했습니다.";
+				case 410 -> "리소스가 삭제되었거나(syncToken/updatedMin 무효) 전체 동기화가 필요할 수 있습니다.";
 				case 429 -> "요청이 너무 많습니다. 잠시 후 시도해주세요.";
 				default -> "Google Calendar 오류: " + ex.getStatusMessage();
 			};
