@@ -14,3 +14,8 @@ spring:
       enabled: true
     restart:
       enabled: true
+
+decorator:
+  datasource:
+    p6spy:
+      enable-logging: true
