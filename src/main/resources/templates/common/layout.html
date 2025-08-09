@@ -119,14 +119,11 @@
     (() => {
         const _fetch = window.fetch;
         window.fetch = function(input, init = {}) {
-            console.log('=== 2. 커스텀 fetch 호출됨 ===', input);
             init.credentials = init.credentials || 'include';
             return _fetch(input, init)
                 .then(response => {
-                    console.log('=== 3. 응답 받음 ===', response.status);
                     // 1) 인증 실패나 리다이렉트
                     if (response.status === 401) {
-                        console.log('=== 401 처리 중 ===');
                         // 리다이렉트 처리
                         if (typeof showToast === 'function') {
                             showToast('로그인이 필요한 기능입니다.', 'info');
