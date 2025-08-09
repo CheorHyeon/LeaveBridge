@@ -312,6 +312,60 @@
             }
         }
 
+        // ➊ validateDateTime 함수를 전역으로 이동
+        function validateDateTime() {
+            const startDateEl = document.getElementById('inputStartDate');
+            const endDateEl = document.getElementById('inputEndDate');
+            const startTimeEl = document.getElementById('inputStartTime');
+            const endTimeEl = document.getElementById('inputEndTime');
+            const allDayCheck = document.getElementById('allDayCheck');
+            const leaveTypeEl = document.getElementById('leaveType');
+
+            const sd = startDateEl.value;
+            const ed = endDateEl.value;
+            const st = startTimeEl.value;
+            const et = endTimeEl.value;
+            const currentType = leaveTypeEl.value;
+
+            // 1) 날짜 비교
+            if (sd && ed && sd > ed) {
+                startDateEl.setCustomValidity('invalid-date');
+                startDateEl.classList.add('is-invalid');
+                return false;
+            }
+            // 2) 하루종일이 아닌 경우 시간 검사
+            if (!allDayCheck.checked) {
+                // 공휴일, 공가, 기념일, 회의의 경우 시간 입력 필수
+                if (['NON_DEDUCTIBLE', 'MEETING', 'PUBLIC_HOLIDAY', 'ANNIVERSARY'].includes(currentType)) {
+                    if (!st || !et) {
+                        if (!st) {
+                            startTimeEl.setCustomValidity('시작 시간을 입력해주세요.');
+                            startTimeEl.classList.add('is-invalid');
+                        }
+                        if (!et) {
+                            endTimeEl.setCustomValidity('종료 시간을 입력해주세요.');
+                            endTimeEl.classList.add('is-invalid');
+                        }
+                        return false;
+                    }
+                }
+
+                // 시간 비교 (시작시간이 종료시간보다 늦으면 안됨)
+                if (st && et && st >= et) {
+                    startTimeEl.setCustomValidity('시작 시간은 종료 시간보다 빨라야 합니다.');
+                    startTimeEl.classList.add('is-invalid');
+                    return false;
+                }
+
+                /* 모두 통과 → 기존 오류 리셋 */
+                [startDateEl, startTimeEl, endTimeEl].forEach(el => {
+                    el.setCustomValidity('');
+                    el.classList.remove('is-invalid');
+                });
+            }
+            return true;
+        }
+
         const allDayCheck = document.getElementById('allDayCheck');
         allDayCheck.addEventListener('change', onModifyToggleAllDayChange);
 
@@ -417,7 +471,7 @@
                         return;
 
                     case 'OUTING':
-                        setTimeBasedMode(null, null, false, workStartTime, workEndTime);
+                        setTimeBasedMode(workStartTime, workEndTime, false, workStartTime, workEndTime);
                         break;
 
                     /* ④-1 공가·회의 → 근무시간 범위 */
@@ -733,7 +787,15 @@
                             document.getElementById('modalEditBtn').setAttribute('data-event-id', currentEventId);
 
                             // 2) 권한이 있을 때만 버튼 보이기 (백엔드에서 isOwner 혹은 canEdit 필드 제공)
-                            if (data.isOwner) {
+
+                            // 권한 체크: 관리자는 수정, 삭제 버튼 항시 노출 + 일반 일정은 작성자도 노출
+                            let canEdit =  window.isAdmin;
+
+                            if (!canEdit) {
+                                canEdit = data.isOwner;
+                            }
+
+                            if (canEdit) {
                                 modalEditBtn.style.display = '';
                                 modalDeleteBtn.style.display = '';
                                 modalEditBtn.setAttribute('data-event-id', currentEventId);
@@ -741,6 +803,7 @@
                                 modalEditBtn.style.display = 'none';
                                 modalDeleteBtn.style.display = 'none';
                             }
+
 
                             // 휴일 라벨·정보 토글
                             const isHoliday = data.isHoliday;
@@ -852,53 +915,6 @@
             // 2) FullCalendar 이벤트 다시 불러오기
             function refreshCalendarEvents() {
                 calendar.refetchEvents();
-            }
-
-            // ➊ 검증 함수
-            function validateDateTime() {
-                const sd = startDateEl.value;        // "2025-07-30"
-                const ed = endDateEl.value;          // ""
-                const st = startTimeEl.value;        // "13:00"
-                const et = endTimeEl.value;
-                const currentType = leaveTypeEl.value;
-
-                // 1) 날짜 비교
-                if (sd && ed && sd > ed) {           // YYYY-MM-DD는 문자열 비교 OK
-                    startDateEl.setCustomValidity('invalid-date');
-                    startDateEl.classList.add('is-invalid');
-                    return false;
-                }
-                // 2) 하루종일이 아닌 경우 시간 검사
-                if (!allDayCheck.checked) {
-                    // 공휴일, 공가, 기념일, 회의의 경우 시간 입력 필수
-                    if (['NON_DEDUCTIBLE', 'MEETING', 'PUBLIC_HOLIDAY', 'ANNIVERSARY'].includes(currentType)) {
-                        if (!st || !et) {
-                            if (!st) {
-                                startTimeEl.setCustomValidity('시작 시간을 입력해주세요.');
-                                startTimeEl.classList.add('is-invalid');
-                            }
-                            if (!et) {
-                                endTimeEl.setCustomValidity('종료 시간을 입력해주세요.');
-                                endTimeEl.classList.add('is-invalid');
-                            }
-                            return false;
-                        }
-                    }
-
-                    // 시간 비교 (시작시간이 종료시간보다 늦으면 안됨)
-                    if (st && et && st >= et) {
-                        startTimeEl.setCustomValidity('시작 시간은 종료 시간보다 빨라야 합니다.');
-                        startTimeEl.classList.add('is-invalid');
-                        return false;
-                    }
-
-                    /* 모두 통과 → 기존 오류 리셋 */
-                    [startDateEl, startTimeEl, endTimeEl].forEach(el => {
-                        el.setCustomValidity('');
-                        el.classList.remove('is-invalid');
-                    });
-                    return true;
-                }
             }
 
             // 1) 날짜 필드 실시간 유효성

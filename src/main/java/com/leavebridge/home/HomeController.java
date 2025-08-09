@@ -19,10 +19,14 @@ public class HomeController {
 		model.addAttribute("isAuthenticated", isAuthenticated);
 
 		boolean isGermany = false;
-		if(isAuthenticated)
+		boolean isAdmin = false;
+		if(isAuthenticated) {
 			isGermany = authentication.getAuthorities().contains(MemberRole.ROLE_GERMANY);
+			isAdmin = authentication.getAuthorities().contains(MemberRole.ROLE_ADMIN);
+		}
 
 		model.addAttribute("isGermany", isGermany);
+		model.addAttribute("isAdmin", isAdmin);
 		return "calendar/home";
 	}
 

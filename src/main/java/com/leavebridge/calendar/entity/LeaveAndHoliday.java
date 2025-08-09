@@ -192,8 +192,9 @@ public class LeaveAndHoliday {
 		return member != null && this.member.getId().equals(member.getId());
 	}
 
+	// 구글 캘린더에서 연동한 다른 비회원들 일정만 수정, 삭제 버튼 미노출
 	public boolean canModifyLeave(){
-		return !leaveType.equals(LeaveType.PUBLIC_HOLIDAY) && !leaveType.equals(LeaveType.OTHER_PEOPLE) && !leaveType.equals(LeaveType.NATIONAL_HOLIDAY);
+		return !leaveType.equals(LeaveType.OTHER_PEOPLE);
 	}
 
 	public void updateIsHoliday(Boolean isHoliday) {
