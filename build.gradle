@@ -103,6 +103,9 @@ dependencies {
 
     // apache.sshd
     implementation 'org.apache.sshd:sshd-core:2.7.0'
+
+    // slack
+    implementation("com.slack.api:slack-api-client:1.45.3")
 }
 
 tasks.named('test') {

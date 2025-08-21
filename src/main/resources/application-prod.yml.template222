@@ -13,3 +13,7 @@ spring:
 # 오버라이드 되서 실제 prod 프로필에선 실제 구글 캘린더 이용됨
 # google:
   # calendar-id : {google_calendar_Id_in_prod}
+
+slack:
+  bot-token: {bot_token}
+  channel-id: {채널 Id}
