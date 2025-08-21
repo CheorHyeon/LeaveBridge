@@ -82,6 +82,13 @@
         <discardingThreshold>0</discardingThreshold>
     </appender>
 
+    <!-- slack log 끄기 -->
+    <Configuration>
+        <Loggers>
+            <Logger name="com.slack.api" level="off" additivity="false"/>
+        </Loggers>
+    </Configuration>
+
     <!-- 루트 로거 -->
     <root level="INFO">
         <appender-ref ref="CONSOLE"/>
