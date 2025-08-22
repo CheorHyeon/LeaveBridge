@@ -35,7 +35,7 @@ public class SlackApiClient {
 	@Retryable(
 		maxAttempts = 3,
 		backoff = @Backoff(delay = 2000, multiplier = 2.0),
-		retryFor = { IOException.class, com.slack.api.methods.SlackApiException.class }
+		retryFor = { IOException.class, SlackApiException.class, IllegalStateException.class  }
 	)
 	public void sendMessage(String text) throws SlackApiException, IOException {
 		ChatPostMessageResponse chatPostMessageResponse = methods.chatPostMessage(r -> r
