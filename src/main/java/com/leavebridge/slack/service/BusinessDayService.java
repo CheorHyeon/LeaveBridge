@@ -38,4 +38,11 @@ public class BusinessDayService {
 		}
 		return cursor;
 	}
+
+	/** 오늘 이후 날짜의 근무일자 구하기 **/
+	public LocalDate findNextBusinessDayAfter(LocalDate date) {
+		LocalDate c = date.plusDays(1);
+		while (!isBusinessDay(c)) c = c.plusDays(1);
+		return c;
+	}
 }
